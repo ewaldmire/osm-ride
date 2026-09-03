@@ -3,6 +3,7 @@ package com.ewaldmire.osmride.ui.ride
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +17,11 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Explore
@@ -30,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -77,7 +83,9 @@ fun RideScreen(
     val prefsContext = LocalContext.current
     var zoomLevel by remember { mutableStateOf(MapViewPrefs.getZoom(prefsContext)) }
     var headingUp by remember { mutableStateOf(MapViewPrefs.getHeadingUp(prefsContext)) }
-    var tilted by remember { mutableStateOf(MapViewPrefs.getTilted(prefsContext)) }
+    var tiltDegrees by remember { mutableStateOf(MapViewPrefs.getTiltDegrees(prefsContext)) }
+
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     LaunchedEffect(stats.state) {
         if (stats.state == RideState.FINISHED) onFinished()
@@ -113,14 +121,14 @@ fun RideScreen(
                 followBike = true,
                 zoomLevel = zoomLevel,
                 headingUp = headingUp,
-                tilted = tilted,
+                tiltDegrees = tiltDegrees,
                 modifier = Modifier.fillMaxSize(),
             )
         }
 
         MapControls(
             headingUp = headingUp,
-            tilted = tilted,
+            tiltDegrees = tiltDegrees,
             onZoomIn = {
                 zoomLevel = MapViewPrefs.clampZoom(zoomLevel + 1.0)
                 MapViewPrefs.setZoom(prefsContext, zoomLevel)
@@ -133,9 +141,9 @@ fun RideScreen(
                 headingUp = !headingUp
                 MapViewPrefs.setHeadingUp(prefsContext, headingUp)
             },
-            onToggleTilt = {
-                tilted = !tilted
-                MapViewPrefs.setTilted(prefsContext, tilted)
+            onTiltChanged = { newTilt ->
+                tiltDegrees = MapViewPrefs.clampTilt(newTilt)
+                MapViewPrefs.setTiltDegrees(prefsContext, tiltDegrees)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -153,21 +161,39 @@ fun RideScreen(
                 ),
         )
 
+        // In landscape, a full-width stats card (like portrait's) would cover most of the map -
+        // dock it to the left as a narrower column instead, matching the pause/finish card
+        // moving to the right, so the map stays visible in between.
         Surface(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(12.dp),
+            modifier = if (isLandscape) {
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth(0.42f)
+                    .statusBarsPadding()
+                    .padding(12.dp)
+            } else {
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(12.dp)
+            },
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
             shadowElevation = 4.dp,
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
                 LinearProgressIndicator(
                     progress = { stats.progressFraction.toFloat() },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                currentRoute?.let { route ->
+                    ElevationProfileChart(
+                        route = route,
+                        progressMeters = stats.distanceMeters,
+                        modifier = Modifier.fillMaxWidth().height(36.dp).padding(top = 8.dp),
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -217,12 +243,22 @@ fun RideScreen(
             }
         }
 
+        // Landscape mirrors the stats card: dock to the right as a narrower column instead of
+        // spanning the full width, so it doesn't cover the map.
         Card(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(16.dp),
+            modifier = if (isLandscape) {
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .fillMaxWidth(0.32f)
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+            } else {
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+            },
         ) {
             if (stats.state == RideState.IDLE) {
                 Row(
@@ -239,35 +275,7 @@ fun RideScreen(
                     }
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                when (stats.state) {
-                    RideState.IDLE -> {
-                        Button(onClick = viewModel::start, modifier = Modifier.weight(1f)) {
-                            Text("Start Ride")
-                        }
-                    }
-                    RideState.RIDING -> {
-                        OutlinedButton(onClick = viewModel::pause, modifier = Modifier.weight(1f)) {
-                            Text("Pause")
-                        }
-                        Button(onClick = viewModel::finishManually, modifier = Modifier.weight(1f)) {
-                            Text("Finish")
-                        }
-                    }
-                    RideState.PAUSED -> {
-                        Button(onClick = viewModel::start, modifier = Modifier.weight(1f)) {
-                            Text("Resume")
-                        }
-                        Button(onClick = viewModel::finishManually, modifier = Modifier.weight(1f)) {
-                            Text("Finish")
-                        }
-                    }
-                    RideState.FINISHED -> Unit
-                }
-            }
+            RideActionButtons(state = stats.state, isLandscape = isLandscape, viewModel = viewModel)
         }
     }
 
@@ -283,6 +291,71 @@ fun RideScreen(
     }
 }
 
+@Composable
+private fun RideActionButtons(state: RideState, isLandscape: Boolean, viewModel: RideViewModel) {
+    if (isLandscape) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            when (state) {
+                RideState.IDLE -> {
+                    Button(onClick = viewModel::start, modifier = Modifier.fillMaxWidth()) {
+                        Text("Start Ride")
+                    }
+                }
+                RideState.RIDING -> {
+                    OutlinedButton(onClick = viewModel::pause, modifier = Modifier.fillMaxWidth()) {
+                        Text("Pause")
+                    }
+                    Button(onClick = viewModel::finishManually, modifier = Modifier.fillMaxWidth()) {
+                        Text("Finish")
+                    }
+                }
+                RideState.PAUSED -> {
+                    Button(onClick = viewModel::start, modifier = Modifier.fillMaxWidth()) {
+                        Text("Resume")
+                    }
+                    Button(onClick = viewModel::finishManually, modifier = Modifier.fillMaxWidth()) {
+                        Text("Finish")
+                    }
+                }
+                RideState.FINISHED -> Unit
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            when (state) {
+                RideState.IDLE -> {
+                    Button(onClick = viewModel::start, modifier = Modifier.weight(1f)) {
+                        Text("Start Ride")
+                    }
+                }
+                RideState.RIDING -> {
+                    OutlinedButton(onClick = viewModel::pause, modifier = Modifier.weight(1f)) {
+                        Text("Pause")
+                    }
+                    Button(onClick = viewModel::finishManually, modifier = Modifier.weight(1f)) {
+                        Text("Finish")
+                    }
+                }
+                RideState.PAUSED -> {
+                    Button(onClick = viewModel::start, modifier = Modifier.weight(1f)) {
+                        Text("Resume")
+                    }
+                    Button(onClick = viewModel::finishManually, modifier = Modifier.weight(1f)) {
+                        Text("Finish")
+                    }
+                }
+                RideState.FINISHED -> Unit
+            }
+        }
+    }
+}
+
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
@@ -292,11 +365,11 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 @Composable
 private fun MapControls(
     headingUp: Boolean,
-    tilted: Boolean,
+    tiltDegrees: Float,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onToggleHeadingUp: () -> Unit,
-    onToggleTilt: () -> Unit,
+    onTiltChanged: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -317,14 +390,35 @@ private fun MapControls(
                 contentDescription = if (headingUp) "Switch to north-up" else "Switch to heading-up",
             )
         }
-        // Highlighted when tilt is off, since the tilted 3D chase-cam view is the default.
-        MapControlButton(
-            onClick = onToggleTilt,
-            highlighted = !tilted,
+        // A button-driven toggle can't express "how much" tilt, and the two-finger tilt gesture
+        // is easy to miss/fumble on a phone propped up mid-ride - this slider is the reliable,
+        // discoverable control for it.
+        TiltSlider(tiltDegrees = tiltDegrees, onTiltChanged = onTiltChanged)
+    }
+}
+
+@Composable
+private fun TiltSlider(tiltDegrees: Float, onTiltChanged: (Float) -> Unit) {
+    // Local copy so dragging feels immediate; the real tiltDegrees (and the map update it
+    // triggers) only commits on release, so a fast drag doesn't queue up a pile of camera
+    // animations fighting each other.
+    var sliderPosition by remember(tiltDegrees) { mutableStateOf(tiltDegrees) }
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        shadowElevation = 4.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                Icons.Filled.Terrain,
-                contentDescription = if (tilted) "Switch to flat view" else "Switch to 3D view",
+            Icon(Icons.Filled.Terrain, contentDescription = "Camera tilt")
+            Slider(
+                value = sliderPosition,
+                onValueChange = { sliderPosition = it },
+                onValueChangeFinished = { onTiltChanged(sliderPosition) },
+                valueRange = 0f..RIDE_CAMERA_MAX_PITCH_DEGREES.toFloat(),
+                modifier = Modifier.width(120.dp),
             )
         }
     }
@@ -358,7 +452,7 @@ private object MapViewPrefs {
     private const val PREFS_NAME = "map_view_prefs"
     private const val KEY_ZOOM = "zoom"
     private const val KEY_HEADING_UP = "heading_up"
-    private const val KEY_TILTED = "tilted"
+    private const val KEY_TILT_DEGREES = "tilt_degrees"
     private const val DEFAULT_ZOOM = 18.0
     private const val MIN_ZOOM = 12.0
     private const val MAX_ZOOM = 20.0
@@ -376,13 +470,16 @@ private object MapViewPrefs {
         prefs(context).edit().putBoolean(KEY_HEADING_UP, headingUp).apply()
     }
 
-    fun getTilted(context: Context): Boolean = prefs(context).getBoolean(KEY_TILTED, true)
+    fun getTiltDegrees(context: Context): Float =
+        prefs(context).getFloat(KEY_TILT_DEGREES, RIDE_CAMERA_DEFAULT_TILT_DEGREES.toFloat())
 
-    fun setTilted(context: Context, tilted: Boolean) {
-        prefs(context).edit().putBoolean(KEY_TILTED, tilted).apply()
+    fun setTiltDegrees(context: Context, tiltDegrees: Float) {
+        prefs(context).edit().putFloat(KEY_TILT_DEGREES, tiltDegrees).apply()
     }
 
     fun clampZoom(zoom: Double): Double = zoom.coerceIn(MIN_ZOOM, MAX_ZOOM)
+
+    fun clampTilt(tiltDegrees: Float): Float = tiltDegrees.coerceIn(0f, RIDE_CAMERA_MAX_PITCH_DEGREES.toFloat())
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 }

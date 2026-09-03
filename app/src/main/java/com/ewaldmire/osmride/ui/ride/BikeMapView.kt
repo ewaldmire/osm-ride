@@ -63,16 +63,14 @@ private val BUILDING_COLORS = intArrayOf(
     0xFF9C9186.toInt(), // cool gray
 )
 
-/** Pitch (degrees from straight-down) for the following camera - gives a 3D "chase cam" view of
- * buildings along the route instead of a flat top-down map. MapLibre's default pitch ceiling is
- * 60 (raised below via setMaxPitchPreference), so this and RIDE_CAMERA_MAX_PITCH_DEGREES sit
- * close together - push both higher together if the SDK actually honors it on-device. */
-private const val RIDE_CAMERA_TILT_DEGREES = 65.0
+/** Default pitch (degrees from straight-down) for the following camera - gives a 3D "chase cam"
+ * view of buildings along the route instead of a flat top-down map. */
+const val RIDE_CAMERA_DEFAULT_TILT_DEGREES = 65.0
 
-/** Ceiling for both the tilt button and the two-finger tilt gesture - MapLibre's own default is
+/** Ceiling for both the tilt slider and the two-finger tilt gesture - MapLibre's own default is
  * 60; this asks for more legroom toward a horizon-level view, but flat vector tiles (no terrain
  * mesh, no sky) will look increasingly stretched/distorted well before reaching it. */
-private const val RIDE_CAMERA_MAX_PITCH_DEGREES = 80.0
+const val RIDE_CAMERA_MAX_PITCH_DEGREES = 80.0
 
 /** Fraction of the map's height reserved as top padding while following - this recentres the
  * camera's focal point toward the bottom of the screen, so the bike renders "in the foreground"
@@ -86,7 +84,9 @@ private const val RIDE_CAMERA_TOP_PADDING_FRACTION = 0.6
  *   buttons can adjust it and have it "stick".
  * @param headingUp true rotates the camera to match travel direction (bike always points up);
  *   false keeps the map north-up and only the bike icon itself rotates.
- * @param tilted true uses a pitched 3D chase-cam view; false is a flat top-down view.
+ * @param tiltDegrees camera pitch in degrees (0 = flat top-down, higher = more of a 3D chase-cam
+ *   view); caller-controlled by the tilt slider, same "stick until a control is touched" pattern
+ *   as [zoomLevel].
  */
 @Composable
 fun BikeMapView(
@@ -95,7 +95,7 @@ fun BikeMapView(
     followBike: Boolean,
     zoomLevel: Double,
     headingUp: Boolean,
-    tilted: Boolean,
+    tiltDegrees: Float,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -151,12 +151,12 @@ fun BikeMapView(
     // A MapControls button tap is the only thing that changes zoomLevel/headingUp - use that as
     // the "revert to normal behavior" signal, distinct from the position-driven effect below
     // (which re-runs every tick and must not clear the override on its own).
-    DisposableEffect(zoomLevel, headingUp, tilted) {
+    DisposableEffect(zoomLevel, headingUp, tiltDegrees) {
         manualOverrideActive = false
         onDispose { }
     }
 
-    DisposableEffect(position, followBike, zoomLevel, headingUp, tilted, manualOverrideActive) {
+    DisposableEffect(position, followBike, zoomLevel, headingUp, tiltDegrees, manualOverrideActive) {
         if (position != null) {
             mapView.getMapAsync { map ->
                 val style = map.style ?: return@getMapAsync
@@ -174,18 +174,15 @@ fun BikeMapView(
                         // straight up on screen, matching the rotated map underneath it).
                         // North-up: camera bearing stays fixed at 0 and only the icon rotates.
                         // Padding is only meaningful while tilted (it's what reveals the horizon
-                        // above the bike), so it resets to 0 for a flat top-down view.
-                        val topPaddingPx = if (tilted) {
-                            (mapView.height * RIDE_CAMERA_TOP_PADDING_FRACTION).toInt()
-                        } else {
-                            0
-                        }
+                        // above the bike), so it fades out toward 0 for a flat top-down view.
+                        val tiltFraction = (tiltDegrees / RIDE_CAMERA_MAX_PITCH_DEGREES.toFloat()).coerceIn(0f, 1f)
+                        val topPaddingPx = (mapView.height * RIDE_CAMERA_TOP_PADDING_FRACTION * tiltFraction).toInt()
                         map.setPadding(0, topPaddingPx, 0, 0)
                         val cameraPosition = CameraPosition.Builder()
                             .target(LatLng(position.lat, position.lon))
                             .zoom(zoomLevel)
                             .bearing(if (headingUp) position.bearingDegrees else 0.0)
-                            .tilt(if (tilted) RIDE_CAMERA_TILT_DEGREES else 0.0)
+                            .tilt(tiltDegrees.toDouble())
                             .build()
                         map.easeCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 900)
                     }
