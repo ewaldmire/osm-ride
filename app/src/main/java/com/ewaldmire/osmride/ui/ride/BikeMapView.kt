@@ -68,18 +68,20 @@ private val BUILDING_COLORS = intArrayOf(
 const val RIDE_CAMERA_DEFAULT_TILT_DEGREES = 65.0
 
 /** Ceiling for both the tilt slider and the two-finger tilt gesture - MapLibre's own default is
- * 60; this asks for more legroom toward a horizon-level view. It's possible the native Android
- * SDK silently clamps below whatever's requested here even so (unconfirmed - can't be tested in
- * this sandbox), in which case RIDE_CAMERA_TOP_PADDING_FRACTION below is the more reliable lever
- * for "see further ahead," since it doesn't depend on how much pitch the SDK actually honors. */
-const val RIDE_CAMERA_MAX_PITCH_DEGREES = 85.0
+ * 60; this asks for more legroom toward a horizon-level view. Pushed higher than a prior attempt
+ * at 85, which combined with a much larger RIDE_CAMERA_TOP_PADDING_FRACTION and caused real lag/
+ * crashes on-device - that padding push was reverted below rather than raised further alongside
+ * this, specifically so a repeat of that problem can be attributed to pitch alone, not both at
+ * once. High pitch alone still means rendering far more distant tiles toward the horizon, which
+ * is inherently expensive - if this is laggy too, the ceiling needs to come back down, not up. */
+const val RIDE_CAMERA_MAX_PITCH_DEGREES = 88.0
 
 /** Fraction of the map's height reserved as top padding while following - this recentres the
  * camera's focal point toward the bottom of the screen, so the bike renders "in the foreground"
- * with the road/horizon ahead of it visible above, instead of sitting dead-center. Pushed close
- * to its practical ceiling: much higher and the focal point starts approaching the very edge of
- * the screen. */
-private const val RIDE_CAMERA_TOP_PADDING_FRACTION = 0.78
+ * with the road/horizon ahead of it visible above, instead of sitting dead-center. Reverted from
+ * a brief attempt at 0.78, which shipped alongside a pitch-ceiling increase in the same commit
+ * and coincided with reported lag/crashes on-device - back to the last confirmed-stable value. */
+private const val RIDE_CAMERA_TOP_PADDING_FRACTION = 0.6
 
 /**
  * MapLibre map showing the route polyline and a bike marker that follows live ride progress.
