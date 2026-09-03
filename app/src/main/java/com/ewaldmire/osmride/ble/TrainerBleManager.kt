@@ -65,6 +65,10 @@ class TrainerBleManager(context: Context) {
     private val _gradeControlState = MutableStateFlow(GradeControlState.UNAVAILABLE)
     val gradeControlState: StateFlow<GradeControlState> = _gradeControlState.asStateFlow()
 
+    /** Name of the currently connecting/connected device, for a "what's connected" display. */
+    private val _connectedDeviceName = MutableStateFlow<String?>(null)
+    val connectedDeviceName: StateFlow<String?> = _connectedDeviceName.asStateFlow()
+
     private var gatt: BluetoothGatt? = null
     private var protocol: TrainerProtocol? = null
     private var controlPointCharacteristic: BluetoothGattCharacteristic? = null
@@ -126,6 +130,7 @@ class TrainerBleManager(context: Context) {
         stopScan()
         val device = adapter?.getRemoteDevice(address) ?: return
         resetPerConnectionState()
+        _connectedDeviceName.value = device.name ?: address
         _connectionState.value = BleConnectionState.CONNECTING
         gatt = device.connectGatt(appContext, false, gattCallback)
     }
@@ -152,6 +157,7 @@ class TrainerBleManager(context: Context) {
         controlPointCharacteristic = null
         lastSentGradeTenths = null
         _gradeControlState.value = GradeControlState.UNAVAILABLE
+        _connectedDeviceName.value = null
     }
 
     /**
@@ -195,6 +201,7 @@ class TrainerBleManager(context: Context) {
         disconnect()
         _connectionState.value = BleConnectionState.CONNECTED
         _gradeControlState.value = GradeControlState.ACTIVE
+        _connectedDeviceName.value = "Simulated Trainer"
         simulationJob = simulationScope.launch {
             var t = 0.0
             while (isActive) {

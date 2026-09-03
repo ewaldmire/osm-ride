@@ -38,6 +38,10 @@ class HeartRateBleManager(context: Context) {
     private val _samples = MutableSharedFlow<HeartRateSample>(extraBufferCapacity = 16)
     val samples: SharedFlow<HeartRateSample> = _samples.asSharedFlow()
 
+    /** Name of the currently connecting/connected device, for a "what's connected" display. */
+    private val _connectedDeviceName = MutableStateFlow<String?>(null)
+    val connectedDeviceName: StateFlow<String?> = _connectedDeviceName.asStateFlow()
+
     private var gatt: BluetoothGatt? = null
 
     private val scanCallback = object : ScanCallback() {
@@ -78,6 +82,7 @@ class HeartRateBleManager(context: Context) {
     fun connect(address: String) {
         stopScan()
         val device = adapter?.getRemoteDevice(address) ?: return
+        _connectedDeviceName.value = device.name ?: address
         _connectionState.value = BleConnectionState.CONNECTING
         gatt = device.connectGatt(appContext, false, gattCallback)
     }
@@ -86,6 +91,7 @@ class HeartRateBleManager(context: Context) {
         gatt?.disconnect()
         gatt?.close()
         gatt = null
+        _connectedDeviceName.value = null
         _connectionState.value = BleConnectionState.DISCONNECTED
     }
 

@@ -19,4 +19,8 @@ class RideHistoryViewModel(application: Application) : AndroidViewModel(applicat
     fun deleteRide(id: String) {
         viewModelScope.launch { repository.deleteRide(id) }
     }
+
+    fun updateRide(id: String, title: String, notes: String) {
+        viewModelScope.launch { repository.updateRide(id, title, notes) }
+    }
 }

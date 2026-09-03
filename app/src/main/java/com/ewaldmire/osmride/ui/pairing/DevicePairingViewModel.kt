@@ -16,8 +16,10 @@ class DevicePairingViewModel(application: Application) : AndroidViewModel(applic
 
     val trainerState: StateFlow<BleConnectionState> = trainerManager.connectionState
     val trainerDevices: StateFlow<List<ScannedDevice>> = trainerManager.scannedDevices
+    val trainerConnectedName: StateFlow<String?> = trainerManager.connectedDeviceName
     val hrState: StateFlow<BleConnectionState> = hrManager.connectionState
     val hrDevices: StateFlow<List<ScannedDevice>> = hrManager.scannedDevices
+    val hrConnectedName: StateFlow<String?> = hrManager.connectedDeviceName
 
     init {
         prefs.getString(KEY_TRAINER, null)?.let { trainerManager.connect(it) }

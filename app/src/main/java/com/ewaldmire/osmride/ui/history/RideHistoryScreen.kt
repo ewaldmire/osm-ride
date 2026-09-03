@@ -13,20 +13,27 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +56,18 @@ fun RideHistoryScreen(
 ) {
     val context = LocalContext.current
     val rides by viewModel.rides.collectAsState()
+    var editingRecord by remember { mutableStateOf<RideRecord?>(null) }
+
+    editingRecord?.let { record ->
+        EditRideDialog(
+            record = record,
+            onSave = { title, notes ->
+                viewModel.updateRide(record.id, title, notes)
+                editingRecord = null
+            },
+            onDismiss = { editingRecord = null },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -84,6 +103,7 @@ fun RideHistoryScreen(
                 items(rides, key = { it.id }) { record ->
                     RideRecordCard(
                         record = record,
+                        onEdit = { editingRecord = record },
                         onShare = {
                             val file = viewModel.gpxFile(record)
                             val uri = FileProvider.getUriForFile(
@@ -141,7 +161,12 @@ private fun OverviewStat(label: String, value: String) {
 }
 
 @Composable
-private fun RideRecordCard(record: RideRecord, onShare: () -> Unit, onDelete: () -> Unit) {
+private fun RideRecordCard(
+    record: RideRecord,
+    onEdit: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -159,6 +184,9 @@ private fun RideRecordCard(record: RideRecord, onShare: () -> Unit, onDelete: ()
                     )
                 }
                 Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit name/notes")
+                    }
                     IconButton(onClick = onShare) {
                         Icon(Icons.Filled.Share, contentDescription = "Share GPX")
                     }
@@ -191,3 +219,40 @@ private fun RideRecordCard(record: RideRecord, onShare: () -> Unit, onDelete: ()
 
 private fun formatDate(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
+
+@Composable
+private fun EditRideDialog(record: RideRecord, onSave: (title: String, notes: String) -> Unit, onDismiss: () -> Unit) {
+    var title by remember(record.id) { mutableStateOf(record.title) }
+    var notes by remember(record.id) { mutableStateOf(record.notes) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Ride") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Ride name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(title.ifBlank { record.routeName }, notes) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}

@@ -47,8 +47,10 @@ fun DevicePairingScreen(
     val context = LocalContext.current
     val trainerState by viewModel.trainerState.collectAsState()
     val trainerDevices by viewModel.trainerDevices.collectAsState()
+    val trainerConnectedName by viewModel.trainerConnectedName.collectAsState()
     val hrState by viewModel.hrState.collectAsState()
     val hrDevices by viewModel.hrDevices.collectAsState()
+    val hrConnectedName by viewModel.hrConnectedName.collectAsState()
 
     var pendingScan by remember { mutableStateOf<(() -> Unit)?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -87,6 +89,7 @@ fun DevicePairingScreen(
             DeviceSection(
                 title = "Smart Trainer",
                 state = trainerState,
+                connectedName = trainerConnectedName,
                 devices = trainerDevices,
                 onScan = { scanWithPermission { viewModel.startTrainerScan() } },
                 onStopScan = viewModel::stopTrainerScan,
@@ -97,6 +100,7 @@ fun DevicePairingScreen(
             DeviceSection(
                 title = "Heart Rate Monitor",
                 state = hrState,
+                connectedName = hrConnectedName,
                 devices = hrDevices,
                 onScan = { scanWithPermission { viewModel.startHrScan() } },
                 onStopScan = viewModel::stopHrScan,
@@ -111,6 +115,7 @@ fun DevicePairingScreen(
 private fun DeviceSection(
     title: String,
     state: BleConnectionState,
+    connectedName: String?,
     devices: List<ScannedDevice>,
     onScan: () -> Unit,
     onStopScan: () -> Unit,
@@ -124,7 +129,10 @@ private fun DeviceSection(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(state.name, style = MaterialTheme.typography.labelMedium)
+            Text(
+                if (connectedName != null) "$connectedName · ${state.name}" else state.name,
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
 
         when (state) {

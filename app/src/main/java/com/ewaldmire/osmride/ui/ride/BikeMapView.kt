@@ -35,9 +35,6 @@ private const val BIKE_SOURCE_ID = "bike-source"
 private const val BIKE_LAYER_ID = "bike-layer"
 private const val BIKE_ICON_ID = "bike-icon"
 
-/** Close enough to see buildings/streets pass by, while staying within OSM raster tile coverage. */
-private const val RIDE_ZOOM = 18.0
-
 /** Plain raster style using standard OpenStreetMap tiles — no vector style/API key needed. */
 private const val OSM_RASTER_STYLE_JSON = """
 {
@@ -60,9 +57,23 @@ private const val OSM_RASTER_STYLE_JSON = """
 }
 """
 
-/** MapLibre map showing the route polyline and a bike marker that follows live ride progress. */
+/**
+ * MapLibre map showing the route polyline and a bike marker that follows live ride progress.
+ *
+ * @param zoomLevel camera zoom while following the bike; caller-controlled so on-screen +/-
+ *   buttons can adjust it and have it "stick".
+ * @param headingUp true rotates the camera to match travel direction (bike always points up);
+ *   false keeps the map north-up and only the bike icon itself rotates.
+ */
 @Composable
-fun BikeMapView(route: Route, position: RidePosition?, followBike: Boolean, modifier: Modifier = Modifier) {
+fun BikeMapView(
+    route: Route,
+    position: RidePosition?,
+    followBike: Boolean,
+    zoomLevel: Double,
+    headingUp: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
 
     val mapView = remember { MapView(context) }
@@ -92,7 +103,7 @@ fun BikeMapView(route: Route, position: RidePosition?, followBike: Boolean, modi
         onDispose { }
     }
 
-    DisposableEffect(position, followBike) {
+    DisposableEffect(position, followBike, zoomLevel, headingUp) {
         if (position != null) {
             mapView.getMapAsync { map ->
                 val style = map.style ?: return@getMapAsync
@@ -100,11 +111,12 @@ fun BikeMapView(route: Route, position: RidePosition?, followBike: Boolean, modi
                 if (followBike) {
                     // Heading-up: rotate the camera to match travel direction (paired with
                     // iconRotationAlignment(MAP) below, the bike icon then renders pointing
-                    // straight up on screen, matching the rotated map underneath it).
+                    // straight up on screen, matching the rotated map underneath it). North-up:
+                    // camera bearing stays fixed at 0 and only the icon itself rotates.
                     val cameraPosition = CameraPosition.Builder()
                         .target(LatLng(position.lat, position.lon))
-                        .zoom(RIDE_ZOOM)
-                        .bearing(position.bearingDegrees)
+                        .zoom(zoomLevel)
+                        .bearing(if (headingUp) position.bearingDegrees else 0.0)
                         .build()
                     map.easeCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 900)
                 }
