@@ -39,4 +39,8 @@ class RoutesListViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteRoute(id: String) {
         viewModelScope.launch { repository.deleteRoute(id) }
     }
+
+    fun renameRoute(id: String, name: String) {
+        viewModelScope.launch { repository.renameRoute(id, name) }
+    }
 }

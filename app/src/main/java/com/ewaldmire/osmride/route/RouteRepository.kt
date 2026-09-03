@@ -79,6 +79,13 @@ class RouteRepository(context: Context) {
         )
     }
 
+    suspend fun renameRoute(id: String, name: String) = withContext(Dispatchers.IO) {
+        val resolved = name.ifBlank { return@withContext }
+        val updated = _routes.value.map { if (it.id == id) it.copy(name = resolved) else it }
+        _routes.value = updated
+        saveIndex(updated)
+    }
+
     suspend fun deleteRoute(id: String) = withContext(Dispatchers.IO) {
         val summary = _routes.value.find { it.id == id } ?: return@withContext
         File(routesDir, summary.fileName).delete()

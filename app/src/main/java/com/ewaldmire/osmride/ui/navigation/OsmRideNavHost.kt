@@ -11,23 +11,32 @@ import com.ewaldmire.osmride.ui.history.RideHistoryScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.ride.RideScreen
 import com.ewaldmire.osmride.ui.routes.RoutesListScreen
+import com.ewaldmire.osmride.ui.settings.SettingsScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
 
 @Composable
 fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
-    NavHost(navController = navController, startDestination = Destinations.ROUTES_LIST) {
+    NavHost(navController = navController, startDestination = Destinations.HISTORY) {
+        composable(Destinations.HISTORY) {
+            RideHistoryScreen(
+                onNewRide = { navController.navigate(Destinations.ROUTES_LIST) },
+                onOpenSettings = { navController.navigate(Destinations.SETTINGS) },
+            )
+        }
         composable(Destinations.ROUTES_LIST) {
             RoutesListScreen(
                 onRouteSelected = { routeId -> navController.navigate(Destinations.ride(routeId)) },
-                onPairDevices = { navController.navigate(Destinations.PAIRING) },
-                onViewHistory = { navController.navigate(Destinations.HISTORY) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Destinations.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPairing = { navController.navigate(Destinations.PAIRING) },
             )
         }
         composable(Destinations.PAIRING) {
             DevicePairingScreen(onDone = { navController.popBackStack() })
-        }
-        composable(Destinations.HISTORY) {
-            RideHistoryScreen(onBack = { navController.popBackStack() })
         }
         composable(
             Destinations.RIDE,
@@ -39,7 +48,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                     routeId = routeId,
                     onFinished = {
                         navController.navigate(Destinations.SUMMARY) {
-                            popUpTo(Destinations.ROUTES_LIST)
+                            popUpTo(Destinations.HISTORY)
                         }
                     },
                 )
@@ -48,7 +57,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
         composable(Destinations.SUMMARY) {
             RideSummaryScreen(
                 onDone = {
-                    navController.popBackStack(Destinations.ROUTES_LIST, inclusive = false)
+                    navController.popBackStack(Destinations.HISTORY, inclusive = false)
                 },
             )
         }
