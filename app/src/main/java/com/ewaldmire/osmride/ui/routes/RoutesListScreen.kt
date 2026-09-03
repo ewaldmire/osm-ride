@@ -185,7 +185,7 @@ private fun RouteCard(route: RouteSummary, onClick: () -> Unit, onRename: () -> 
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(route.name, style = MaterialTheme.typography.titleMedium)
                 Text(
                     "${Units.formatMiles(route.totalDistanceMeters)} · " +

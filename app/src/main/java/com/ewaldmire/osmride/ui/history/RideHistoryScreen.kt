@@ -183,7 +183,7 @@ private fun RideRecordCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(record.title, style = MaterialTheme.typography.titleMedium)
                     if (record.title != record.routeName) {
                         Text("Route: ${record.routeName}", style = MaterialTheme.typography.bodySmall)
