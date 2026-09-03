@@ -82,11 +82,27 @@ fun RideSummaryScreen(
                 }
             }
 
+            Text(
+                "Saved to ride history.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Button(
+                onClick = {
+                    viewModel.saveTitleAndNotes(title, notes)
+                    viewModel.clearActiveRideEngine()
+                    onDone()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Done")
+            }
+
             if (viewModel.hasTrackPoints) {
-                Button(
+                OutlinedButton(
                     enabled = savedRecord != null,
                     onClick = {
-                        val file = viewModel.gpxFileToShare() ?: return@Button
+                        val file = viewModel.gpxFileToShare() ?: return@OutlinedButton
                         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "application/gpx+xml"
@@ -99,22 +115,6 @@ fun RideSummaryScreen(
                 ) {
                     Text("Export / Share GPX")
                 }
-            }
-
-            Text(
-                "Saved to ride history.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-
-            OutlinedButton(
-                onClick = {
-                    viewModel.saveTitleAndNotes(title, notes)
-                    viewModel.clearActiveRideEngine()
-                    onDone()
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Done")
             }
         }
     }
