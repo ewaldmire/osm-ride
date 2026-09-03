@@ -4,6 +4,7 @@ import com.ewaldmire.osmride.ble.HeartRateSample
 import com.ewaldmire.osmride.ble.TrainerSample
 import com.ewaldmire.osmride.route.Route
 import com.ewaldmire.osmride.util.Haversine
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,9 @@ data class RideStats(
     val currentHeartRateBpm: Int? = null,
     /** Average grade, as a percent, over a short window around the current position. */
     val currentGradePercent: Double? = null,
+    /** Non-null while a workout is attached and the current point is within a defined power
+     * segment (null for a free-ride/max-effort stretch, or once the workout has ended). */
+    val currentTargetWatts: Int? = null,
     val avgSpeedMps: Double = 0.0,
     val avgPowerWatts: Double? = null,
     val avgCadenceRpm: Double? = null,
@@ -57,6 +61,11 @@ data class RecordedTrackPoint(
  * export. One instance is used per ride attempt.
  */
 class RideEngine(val route: Route) {
+    /** Optional structured (ERG-mode) workout riding alongside the route. Settable up until
+     * [start] is first called; the route's visuals (map/avatar/distance) are unaffected either
+     * way - only which FTMS control mode gets driven (grade-simulation vs target-power) changes. */
+    var workout: Workout? = null
+
     private val _stats = MutableStateFlow(RideStats(totalDistanceMeters = route.totalDistanceMeters))
     val stats: StateFlow<RideStats> = _stats.asStateFlow()
 
@@ -205,6 +214,7 @@ class RideEngine(val route: Route) {
             currentPowerWatts = latestPower,
             currentHeartRateBpm = latestHeartRate,
             currentGradePercent = gradeAt(clamped),
+            currentTargetWatts = targetWattsAt(elapsedSecondsValue),
             avgSpeedMps = if (elapsedSecondsValue > 0) clamped / elapsedSecondsValue else 0.0,
             avgPowerWatts = if (powerSamples > 0) powerSum / powerSamples else null,
             avgCadenceRpm = if (cadenceSamples > 0) cadenceSum / cadenceSamples else null,
@@ -226,6 +236,22 @@ class RideEngine(val route: Route) {
         val aheadElevation = positionAt(ahead).elevationMeters ?: return null
         val behindElevation = positionAt(behind).elevationMeters ?: return null
         return (aheadElevation - behindElevation) / run * 100.0
+    }
+
+    /** Interpolated ERG target power at [elapsedSeconds] into the ride, from the attached
+     * [workout]'s timeline. Null with no workout attached, past its end, or during a
+     * free-ride/max-effort segment (no fixed target for that stretch). */
+    private fun targetWattsAt(elapsedSeconds: Long): Int? {
+        val segments = workout?.segments ?: return null
+        if (segments.isEmpty()) return null
+        val seg = segments.find { elapsedSeconds >= it.startSeconds && elapsedSeconds < it.endSeconds }
+            ?: segments.last().takeIf { elapsedSeconds >= it.endSeconds }
+            ?: segments.first()
+        val startWatts = seg.startWatts ?: return null
+        val endWatts = seg.endWatts ?: return null
+        val span = (seg.endSeconds - seg.startSeconds).coerceAtLeast(1)
+        val t = ((elapsedSeconds - seg.startSeconds).toDouble() / span).coerceIn(0.0, 1.0)
+        return (startWatts + (endWatts - startWatts) * t).roundToInt()
     }
 
     /** Binary search + linear interpolation of lat/lon/elevation/bearing at [distance] along the route. */

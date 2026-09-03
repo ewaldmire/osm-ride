@@ -8,6 +8,7 @@ import com.ewaldmire.osmride.ble.TrainerBleManager
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.ride.RideForegroundService
 import com.ewaldmire.osmride.ride.RideHistoryRepository
+import com.ewaldmire.osmride.ride.WorkoutRepository
 import com.ewaldmire.osmride.route.RouteRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,7 @@ class OsmRideApp : Application() {
     val heartRateBleManager: HeartRateBleManager by lazy { HeartRateBleManager(this) }
     val routeRepository: RouteRepository by lazy { RouteRepository(this) }
     val rideHistoryRepository: RideHistoryRepository by lazy { RideHistoryRepository(this) }
+    val workoutRepository: WorkoutRepository by lazy { WorkoutRepository(this) }
 
     private val _currentRideEngine = MutableStateFlow<RideEngine?>(null)
     val currentRideEngineFlow: StateFlow<RideEngine?> = _currentRideEngine.asStateFlow()

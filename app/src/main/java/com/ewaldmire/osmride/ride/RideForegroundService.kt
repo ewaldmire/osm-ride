@@ -62,7 +62,14 @@ class RideForegroundService : LifecycleService() {
             .onEach { stats ->
                 val manager = NotificationManagerCompat.from(this)
                 manager.notify(NOTIFICATION_ID, buildNotification(stats.distanceMeters, stats.elapsedSeconds))
-                stats.currentGradePercent?.let { app.trainerBleManager.setSimulatedGrade(it) }
+                // A workout's target power and a route's simulated grade are mutually exclusive
+                // trainer control modes - ERG (workout) takes priority when both are present.
+                val targetWatts = stats.currentTargetWatts
+                if (targetWatts != null) {
+                    app.trainerBleManager.setTargetPower(targetWatts)
+                } else {
+                    stats.currentGradePercent?.let { app.trainerBleManager.setSimulatedGrade(it) }
+                }
                 if (stats.state == RideState.FINISHED) {
                     stopSelf()
                 }

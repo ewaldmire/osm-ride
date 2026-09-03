@@ -34,6 +34,7 @@ private enum class TrainerProtocol { FTMS, CSC }
 
 // FTMS Control Point op codes we use (Bluetooth SIG Fitness Machine Service spec).
 private const val OP_REQUEST_CONTROL: Byte = 0x00
+private const val OP_SET_TARGET_POWER: Byte = 0x05
 private const val OP_SET_INDOOR_BIKE_SIMULATION_PARAMETERS: Byte = 0x11
 private const val OP_RESPONSE_CODE: Byte = 0x80.toByte()
 private const val RESULT_SUCCESS: Byte = 0x01
@@ -73,6 +74,7 @@ class TrainerBleManager(context: Context) {
     private var protocol: TrainerProtocol? = null
     private var controlPointCharacteristic: BluetoothGattCharacteristic? = null
     private var lastSentGradeTenths: Int? = null
+    private var lastSentTargetWatts: Int? = null
 
     private val simulationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var simulationJob: Job? = null
@@ -156,6 +158,7 @@ class TrainerBleManager(context: Context) {
         gattOperationInFlight = false
         controlPointCharacteristic = null
         lastSentGradeTenths = null
+        lastSentTargetWatts = null
         _gradeControlState.value = GradeControlState.UNAVAILABLE
         _connectedDeviceName.value = null
     }
@@ -186,6 +189,27 @@ class TrainerBleManager(context: Context) {
         payload[4] = ((gradeRaw shr 8) and 0xFF).toByte()
         payload[5] = 40 // Crr = 0.0040
         payload[6] = 51 // Cw = 0.51
+
+        enqueueGattOperation { writeControlPoint(characteristic, payload) }
+    }
+
+    /**
+     * ERG mode: tells the trainer to hold a fixed power target regardless of cadence (FTMS
+     * "Set Target Power"), for structured/.erg-style workouts. This and [setSimulatedGrade] are
+     * mutually exclusive trainer modes - callers should send one or the other, not both, for a
+     * given ride.
+     */
+    fun setTargetPower(watts: Int) {
+        val characteristic = controlPointCharacteristic ?: return
+        if (_gradeControlState.value != GradeControlState.ACTIVE) return
+        if (watts == lastSentTargetWatts) return
+        lastSentTargetWatts = watts
+
+        val wattsRaw = watts.coerceIn(-32768, 32767)
+        val payload = ByteArray(3)
+        payload[0] = OP_SET_TARGET_POWER
+        payload[1] = (wattsRaw and 0xFF).toByte()
+        payload[2] = ((wattsRaw shr 8) and 0xFF).toByte()
 
         enqueueGattOperation { writeControlPoint(characteristic, payload) }
     }
@@ -370,7 +394,7 @@ class TrainerBleManager(context: Context) {
             OP_REQUEST_CONTROL -> {
                 _gradeControlState.value = if (success) GradeControlState.ACTIVE else GradeControlState.REJECTED
             }
-            OP_SET_INDOOR_BIKE_SIMULATION_PARAMETERS -> {
+            OP_SET_INDOOR_BIKE_SIMULATION_PARAMETERS, OP_SET_TARGET_POWER -> {
                 if (!success) _gradeControlState.value = GradeControlState.REJECTED
             }
         }

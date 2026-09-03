@@ -12,6 +12,7 @@ import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.ride.RideScreen
 import com.ewaldmire.osmride.ui.routes.RoutesListScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
+import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
 
 @Composable
@@ -33,7 +34,11 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenPairing = { navController.navigate(Destinations.PAIRING) },
+                onOpenWorkouts = { navController.navigate(Destinations.WORKOUTS_LIST) },
             )
+        }
+        composable(Destinations.WORKOUTS_LIST) {
+            WorkoutsListScreen(onBack = { navController.popBackStack() })
         }
         composable(Destinations.PAIRING) {
             DevicePairingScreen(onDone = { navController.popBackStack() })

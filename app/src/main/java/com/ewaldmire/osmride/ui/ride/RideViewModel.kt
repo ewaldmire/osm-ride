@@ -11,6 +11,7 @@ import com.ewaldmire.osmride.ble.GradeControlState
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.ride.RideForegroundService
 import com.ewaldmire.osmride.ride.RideStats
+import com.ewaldmire.osmride.ride.Workout
 import com.ewaldmire.osmride.route.Route
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,10 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
     val heartRateConnectionState: StateFlow<BleConnectionState> = hrManager.connectionState
     val gradeControlState: StateFlow<GradeControlState> = trainerManager.gradeControlState
 
+    val availableWorkouts: StateFlow<List<Workout>> = app.workoutRepository.workouts
+    private val _selectedWorkoutName = MutableStateFlow<String?>(null)
+    val selectedWorkoutName: StateFlow<String?> = _selectedWorkoutName.asStateFlow()
+
     private var engine: RideEngine? = null
     private var loadedRouteId: String? = null
 
@@ -65,8 +70,16 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
             engine = activeEngine
             _route.value = activeEngine.route
             _stats.value = activeEngine.stats.value
+            _selectedWorkoutName.value = activeEngine.workout?.name
             viewModelScope.launch { activeEngine.stats.collect { _stats.value = it } }
         }
+    }
+
+    /** Only meaningful before [start] - the workout is fixed for the ride once it begins. */
+    fun selectWorkout(workoutId: String?) {
+        val workout = workoutId?.let { app.workoutRepository.getWorkout(it) }
+        engine?.workout = workout
+        _selectedWorkoutName.value = workout?.name
     }
 
     fun start() {

@@ -8,6 +8,7 @@ object Destinations {
     /** Home screen: ride history + overview, with New Ride / Settings in its bottom bar. */
     const val HISTORY = "history"
     const val SETTINGS = "settings"
+    const val WORKOUTS_LIST = "workouts_list"
 
     fun ride(routeId: String) = "ride/$routeId"
 }

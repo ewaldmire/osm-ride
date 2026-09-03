@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ble.BleConnectionState
 import com.ewaldmire.osmride.ble.GradeControlState
 import com.ewaldmire.osmride.ride.RideState
+import com.ewaldmire.osmride.ride.Workout
 import com.ewaldmire.osmride.util.Units
 
 @Composable
@@ -64,6 +67,9 @@ fun RideScreen(
     val stats by viewModel.stats.collectAsState()
     val trainerConnected by viewModel.trainerConnectionState.collectAsState()
     val gradeControlState by viewModel.gradeControlState.collectAsState()
+    val availableWorkouts by viewModel.availableWorkouts.collectAsState()
+    val selectedWorkoutName by viewModel.selectedWorkoutName.collectAsState()
+    var showWorkoutPicker by remember { mutableStateOf(false) }
 
     // Zoom/rotation-mode "stick" across rides via SharedPreferences, not just this composition.
     val prefsContext = LocalContext.current
@@ -160,7 +166,6 @@ fun RideScreen(
                     StatChip("Distance", Units.formatMiles(stats.distanceMeters))
                     StatChip("Time", Units.formatDuration(stats.elapsedSeconds))
                     StatChip("Speed", Units.formatMph(stats.currentSpeedMps))
-                    StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -170,7 +175,14 @@ fun RideScreen(
                     StatChip("Power", Units.formatWatts(stats.currentPowerWatts?.toDouble()))
                     StatChip("Heart Rate", Units.formatHeartRate(stats.currentHeartRateBpm))
                 }
-                gradeControlStatusText(gradeControlState)?.let { statusText ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
+                    StatChip("ERG Target", Units.formatWatts(stats.currentTargetWatts?.toDouble()))
+                }
+                controlStatusText(gradeControlState, stats.currentTargetWatts != null)?.let { statusText ->
                     Text(
                         statusText,
                         style = MaterialTheme.typography.bodySmall,
@@ -196,6 +208,21 @@ fun RideScreen(
                 .navigationBarsPadding()
                 .padding(16.dp),
         ) {
+            if (stats.state == RideState.IDLE) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Workout: ${selectedWorkoutName ?: "None"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    TextButton(onClick = { showWorkoutPicker = true }) {
+                        Text(if (selectedWorkoutName == null) "Choose" else "Change")
+                    }
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -226,6 +253,17 @@ fun RideScreen(
                 }
             }
         }
+    }
+
+    if (showWorkoutPicker) {
+        WorkoutPickerDialog(
+            workouts = availableWorkouts,
+            onSelect = { workoutId ->
+                viewModel.selectWorkout(workoutId)
+                showWorkoutPicker = false
+            },
+            onDismiss = { showWorkoutPicker = false },
+        )
     }
 }
 
@@ -315,12 +353,43 @@ private object MapViewPrefs {
 }
 
 /** Null when there's nothing worth telling the rider (not connected, or trainer doesn't
- * support it at all) - only surface the states that need a heads-up. */
-private fun gradeControlStatusText(state: GradeControlState): String? = when (state) {
-    GradeControlState.REQUESTING -> "Auto-resistance: connecting…"
-    GradeControlState.ACTIVE -> "Auto-resistance: on"
-    GradeControlState.REJECTED -> "Auto-resistance: unavailable"
+ * support it at all) - only surface the states that need a heads-up. [hasTarget] picks the
+ * wording: ERG mode (workout target power) vs simulated-grade auto-resistance. */
+private fun controlStatusText(state: GradeControlState, hasTarget: Boolean): String? = when (state) {
+    GradeControlState.REQUESTING -> "Trainer control: connecting…"
+    GradeControlState.ACTIVE -> if (hasTarget) "ERG mode: on" else "Auto-resistance: on"
+    GradeControlState.REJECTED -> "Trainer control: unavailable"
     GradeControlState.UNAVAILABLE -> null
+}
+
+@Composable
+private fun WorkoutPickerDialog(workouts: List<Workout>, onSelect: (String?) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Workout") },
+        text = {
+            if (workouts.isEmpty()) {
+                Text("No workouts imported yet. Add one from Settings > Workout Library.")
+            } else {
+                Column {
+                    workouts.forEach { workout ->
+                        TextButton(
+                            onClick = { onSelect(workout.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(workout.name, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSelect(null) }) { Text("None") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable
