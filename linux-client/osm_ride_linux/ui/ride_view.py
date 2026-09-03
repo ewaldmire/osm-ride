@@ -19,7 +19,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 from ..ble.models import BleConnectionState, HeartRateSample, TrainerSample  # noqa: E402
 from ..ride import gpx_writer  # noqa: E402
 from ..ride.engine import RideEngine  # noqa: E402
-from ..ride.models import RideState, RideStats  # noqa: E402
+from ..ride.models import RideState, RideStats, Workout  # noqa: E402
 from ..route.models import Route  # noqa: E402
 from ..util import units  # noqa: E402
 from .ride_map_view import RideMapView  # noqa: E402
@@ -43,6 +43,7 @@ class RideView(Gtk.Overlay):
         self._clock_tick_source: int | None = None
         self._zoom_level = _DEFAULT_ZOOM
         self._tilt_degrees = _DEFAULT_TILT_DEGREES
+        self._selected_workout: Workout | None = None
 
         self.map_view = RideMapView()
         self.add(self.map_view)
@@ -140,12 +141,28 @@ class RideView(Gtk.Overlay):
         panel.set_halign(Gtk.Align.CENTER)
         panel.set_margin_bottom(12)
 
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.set_margin_top(4)
+        outer.set_margin_bottom(4)
+        outer.set_margin_start(8)
+        outer.set_margin_end(8)
+
+        # Only meaningful (and only shown) before Start - the workout is fixed for the ride once
+        # it begins, same as the Android ViewModel's comment on selectWorkout().
+        self._workout_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._workout_label = Gtk.Label(label="Workout: None")
+        self._workout_button = Gtk.Button(label="Choose")
+        self._workout_button.connect("clicked", lambda _b: self._open_workout_picker())
+        self._workout_row.pack_start(self._workout_label, False, False, 0)
+        self._workout_row.pack_start(self._workout_button, False, False, 0)
+        outer.pack_start(self._workout_row, False, False, 4)
+
         self._button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self._button_box.set_margin_top(8)
-        self._button_box.set_margin_bottom(8)
-        self._button_box.set_margin_start(8)
-        self._button_box.set_margin_end(8)
-        panel.add(self._button_box)
+        self._button_box.set_margin_top(4)
+        self._button_box.set_margin_bottom(4)
+        outer.pack_start(self._button_box, False, False, 0)
+
+        panel.add(outer)
         self.add_overlay(panel)
 
         back = Gtk.Button(label="< Routes")
@@ -167,10 +184,9 @@ class RideView(Gtk.Overlay):
         self._engine = RideEngine(route)
         self._engine.on_stats_changed = lambda stats: GLib.idle_add(self._on_stats_changed, stats)
 
-        workout = self._select_default_workout()
-        self._engine.workout = workout
-        self._workout_chart.set_visible(workout is not None)
-        self._workout_chart.set_workout(workout)
+        # Workout selection is per ride-attempt, same as the Android ViewModel - a fresh route
+        # starts with none attached.
+        self._set_workout(None)
 
         self.map_view.set_route(route)
 
@@ -182,12 +198,6 @@ class RideView(Gtk.Overlay):
 
         self._render_controls()
         self._on_stats_changed(self._engine.stats)
-
-    def _select_default_workout(self):  # noqa: ANN201 - Workout | None, avoiding an import cycle
-        # v1: no workout picker UI yet on this screen - ERG mode just isn't engaged unless one
-        # gets attached some other way in future. Route-grade simulation (the non-ERG path)
-        # still works fully without this.
-        return None
 
     def _on_trainer_sample(self, sample: TrainerSample) -> None:
         GLib.idle_add(self._apply_trainer_sample, sample)
@@ -273,11 +283,59 @@ class RideView(Gtk.Overlay):
         self._engine = None
         self.window.show_history()
 
+    def _open_workout_picker(self) -> None:
+        dialog = Gtk.Dialog(title="Choose Workout", transient_for=self.window, modal=True)
+        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL)
+        content = dialog.get_content_area()
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+
+        list_box = Gtk.ListBox()
+        workouts = self.app.workout_repository.workouts
+        if not workouts:
+            content.pack_start(
+                Gtk.Label(label="No workouts imported yet. Add one from the Workout Library."),
+                False,
+                False,
+                0,
+            )
+        else:
+            none_row = Gtk.ListBoxRow()
+            none_row.add(Gtk.Label(label="None", xalign=0.0))
+            list_box.add(none_row)
+            for workout in workouts:
+                row = Gtk.ListBoxRow()
+                row.add(Gtk.Label(label=workout.name, xalign=0.0))
+                row.workout = workout  # type: ignore[attr-defined]
+                list_box.add(row)
+            list_box.connect("row-activated", self._on_workout_row_activated, dialog)
+            content.pack_start(list_box, True, True, 0)
+
+        dialog.show_all()
+        dialog.run()
+        dialog.destroy()
+
+    def _on_workout_row_activated(self, _list_box: Gtk.ListBox, row: Gtk.ListBoxRow, dialog: Gtk.Dialog) -> None:
+        self._set_workout(getattr(row, "workout", None))
+        dialog.destroy()
+
+    def _set_workout(self, workout: Workout | None) -> None:
+        self._selected_workout = workout
+        if self._engine is not None:
+            self._engine.workout = workout
+        self._workout_chart.set_visible(workout is not None)
+        self._workout_chart.set_workout(workout)
+        self._workout_label.set_text(f"Workout: {workout.name if workout else 'None'}")
+        self._workout_button.set_label("Change" if workout else "Choose")
+
     def _render_controls(self) -> None:
         for child in list(self._button_box.get_children()):
             self._button_box.remove(child)
 
         state = self._engine.stats.state if self._engine is not None else RideState.IDLE
+        self._workout_row.set_visible(state == RideState.IDLE)
         if state == RideState.IDLE:
             start_button = Gtk.Button(label="Start Ride")
             start_button.connect("clicked", lambda _b: self._start())
