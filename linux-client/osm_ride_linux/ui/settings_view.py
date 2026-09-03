@@ -34,7 +34,7 @@ class SettingsView(Gtk.Box):
         workouts_row = self._make_row(
             "Workout Library",
             "Import .erg, .mrc, or .zwo structured workouts for ERG mode",
-            lambda: window.show_placeholder("workouts", "Workout Library"),
+            lambda: window.show_workouts(),
         )
 
         ftp_label = Gtk.Label(label="Training", xalign=0.0)

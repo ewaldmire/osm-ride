@@ -13,6 +13,7 @@ from .history_view import HistoryView
 from .pairing_view import PairingView
 from .routes_view import RoutesView
 from .settings_view import SettingsView
+from .workouts_view import WorkoutsView
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -36,6 +37,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.routes_view = RoutesView(self)
         self.stack.add_named(self.routes_view, "routes")
 
+        self.workouts_view = WorkoutsView(self)
+        self.stack.add_named(self.workouts_view, "workouts")
+
         self.stack.set_visible_child_name("history")
         self.show_all()
 
@@ -50,6 +54,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def show_routes(self) -> None:
         self.stack.set_visible_child_name("routes")
+
+    def show_workouts(self) -> None:
+        self.stack.set_visible_child_name("workouts")
 
     def show_placeholder(self, name: str, title: str) -> None:
         """Temporary stand-in for screens not built yet (Routes/Workouts/Settings/Ride) - a

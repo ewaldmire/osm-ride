@@ -42,7 +42,7 @@ class HistoryView(Gtk.Box):
         bottom_bar.set_homogeneous(True)
         for label, handler in [
             ("Settings", window.show_settings),
-            ("Workouts", lambda: window.show_placeholder("workouts", "Workout Library")),
+            ("Workouts", window.show_workouts),
             ("Ride", window.show_routes),
             ("Routes", window.show_routes),
         ]:
