@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OSM Ride</string>
+    <string name="ride_notification_channel_name">Ride Tracking</string>
+    <string name="ride_notification_title">Ride in progress</string>
+</resources>
