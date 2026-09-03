@@ -37,6 +37,12 @@ class DevicePairingViewModel(application: Application) : AndroidViewModel(applic
         prefs.edit().remove(KEY_TRAINER).apply()
     }
 
+    /** Testing helper: feeds fake speed/cadence/power data with no real trainer required. */
+    fun simulateTrainer() {
+        trainerManager.startSimulation()
+        prefs.edit().remove(KEY_TRAINER).apply()
+    }
+
     fun startHrScan() = hrManager.startScan()
     fun stopHrScan() = hrManager.stopScan()
 

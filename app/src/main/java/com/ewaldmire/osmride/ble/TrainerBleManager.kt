@@ -14,12 +14,21 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.ParcelUuid
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 private enum class TrainerProtocol { FTMS, CSC }
 
@@ -48,6 +57,9 @@ class TrainerBleManager(context: Context) {
 
     private var gatt: BluetoothGatt? = null
     private var protocol: TrainerProtocol? = null
+
+    private val simulationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var simulationJob: Job? = null
 
     // CSC-fallback rollover tracking state, reset per-connection.
     private var previousWheelRevs: Long? = null
@@ -105,11 +117,42 @@ class TrainerBleManager(context: Context) {
     }
 
     fun disconnect() {
+        simulationJob?.cancel()
+        simulationJob = null
         gatt?.disconnect()
         gatt?.close()
         gatt = null
         protocol = null
         _connectionState.value = BleConnectionState.DISCONNECTED
+    }
+
+    /**
+     * Testing helper: feeds synthetic speed/cadence/power samples on a 1Hz timer, with no real
+     * BLE device involved, so the ride screen and avatar movement can be exercised without
+     * trainer hardware. Distance is deliberately left null so the same speed-integration path
+     * used for real CSC-only trainers gets exercised too.
+     */
+    fun startSimulation() {
+        disconnect()
+        _connectionState.value = BleConnectionState.CONNECTED
+        simulationJob = simulationScope.launch {
+            var t = 0.0
+            while (isActive) {
+                val speedMps = 5.5 + sin(t / 20.0) * 1.5 // ~9-15.5 mph, slowly varying
+                val cadenceRpm = 82.0 + sin(t / 15.0) * 6.0
+                val powerWatts = 150 + (sin(t / 12.0) * 30.0).roundToInt()
+                _samples.tryEmit(
+                    TrainerSample(
+                        speedMetersPerSecond = speedMps,
+                        cadenceRpm = cadenceRpm,
+                        powerWatts = powerWatts,
+                        totalDistanceMeters = null,
+                    ),
+                )
+                t += 1.0
+                delay(1000)
+            }
+        }
     }
 
     private val gattCallback = object : BluetoothGattCallback() {

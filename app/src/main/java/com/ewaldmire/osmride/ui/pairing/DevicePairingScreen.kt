@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -91,6 +92,7 @@ fun DevicePairingScreen(
                 onStopScan = viewModel::stopTrainerScan,
                 onConnect = viewModel::connectTrainer,
                 onDisconnect = viewModel::disconnectTrainer,
+                onSimulate = viewModel::simulateTrainer,
             )
             DeviceSection(
                 title = "Heart Rate Monitor",
@@ -114,6 +116,7 @@ private fun DeviceSection(
     onStopScan: () -> Unit,
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit,
+    onSimulate: (() -> Unit)? = null,
 ) {
     Column {
         Row(
@@ -140,8 +143,14 @@ private fun DeviceSection(
                 }
             }
             else -> {
-                Button(onClick = onScan, modifier = Modifier.padding(top = 8.dp)) {
-                    Text("Scan")
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(onClick = onScan) { Text("Scan") }
+                    if (onSimulate != null) {
+                        TextButton(onClick = onSimulate) { Text("Simulate for testing") }
+                    }
                 }
             }
         }
