@@ -71,6 +71,34 @@ class WorkoutRepository(context: Context) {
 
     fun getWorkout(id: String): Workout? = _workouts.value.find { it.id == id }
 
+    /** Saves a workout built (or edited) in-app via the block-based workout creator. Pass
+     * [existingId] when re-editing an already-saved workout so it updates in place. */
+    suspend fun saveCreatedWorkout(
+        existingId: String?,
+        name: String,
+        segments: List<WorkoutSegment>,
+    ): Result<Workout> = withContext(Dispatchers.IO) {
+        if (segments.isEmpty()) {
+            return@withContext Result.failure(IllegalArgumentException("Workout has no intervals"))
+        }
+        val id = existingId ?: UUID.randomUUID().toString()
+        val workout = Workout(
+            id = id,
+            name = name.trim().ifEmpty { "New Workout" },
+            segments = segments,
+            totalDurationSeconds = segments.maxOf { it.endSeconds },
+        )
+        val exists = _workouts.value.any { it.id == id }
+        val updated = if (exists) {
+            _workouts.value.map { if (it.id == id) workout else it }
+        } else {
+            _workouts.value + workout
+        }
+        _workouts.value = updated
+        saveIndex(updated)
+        Result.success(workout)
+    }
+
     suspend fun renameWorkout(id: String, name: String) = withContext(Dispatchers.IO) {
         val resolved = name.ifBlank { return@withContext }
         val updated = _workouts.value.map { if (it.id == id) it.copy(name = resolved) else it }

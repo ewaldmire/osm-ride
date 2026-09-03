@@ -15,6 +15,7 @@ import com.ewaldmire.osmride.ui.routes.RoutesListScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
 import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
+import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
 
 @Composable
 fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
@@ -59,7 +60,27 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Destinations.WORKOUTS_LIST) {
-            WorkoutsListScreen(onBack = { navController.popBackStack() })
+            WorkoutsListScreen(
+                onBack = { navController.popBackStack() },
+                onCreateWorkout = { navController.navigate(Destinations.WORKOUT_CREATOR_NEW) },
+                onEditWorkout = { workoutId -> navController.navigate(Destinations.workoutCreatorEdit(workoutId)) },
+            )
+        }
+        composable(
+            Destinations.WORKOUT_CREATOR,
+            arguments = listOf(
+                navArgument("workoutId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            WorkoutCreatorScreen(
+                workoutId = backStackEntry.arguments?.getString("workoutId"),
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
         }
         composable(Destinations.PAIRING) {
             DevicePairingScreen(onDone = { navController.popBackStack() })

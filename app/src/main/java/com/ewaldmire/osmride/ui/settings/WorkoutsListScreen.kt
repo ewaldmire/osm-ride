@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +56,8 @@ import kotlin.math.roundToInt
 @Composable
 fun WorkoutsListScreen(
     onBack: () -> Unit,
+    onCreateWorkout: () -> Unit,
+    onEditWorkout: (String) -> Unit,
     viewModel: WorkoutsListViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -99,8 +102,13 @@ fun WorkoutsListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
-                Icon(Icons.Filled.Add, contentDescription = "Import workout file")
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                FloatingActionButton(onClick = onCreateWorkout) {
+                    Icon(Icons.Filled.Tune, contentDescription = "Create workout")
+                }
+                FloatingActionButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Import workout file")
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
@@ -127,6 +135,7 @@ fun WorkoutsListScreen(
                     WorkoutCard(
                         workout = workout,
                         onRename = { renamingWorkout = workout },
+                        onEditBlocks = { onEditWorkout(workout.id) },
                         onDelete = { viewModel.deleteWorkout(workout.id) },
                     )
                 }
@@ -136,7 +145,12 @@ fun WorkoutsListScreen(
 }
 
 @Composable
-private fun WorkoutCard(workout: Workout, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun WorkoutCard(
+    workout: Workout,
+    onRename: () -> Unit,
+    onEditBlocks: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -153,6 +167,9 @@ private fun WorkoutCard(workout: Workout, onRename: () -> Unit, onDelete: () -> 
                     )
                 }
                 Row {
+                    IconButton(onClick = onEditBlocks) {
+                        Icon(Icons.Filled.Tune, contentDescription = "Edit workout blocks")
+                    }
                     IconButton(onClick = onRename) {
                         Icon(Icons.Filled.Edit, contentDescription = "Rename workout")
                     }

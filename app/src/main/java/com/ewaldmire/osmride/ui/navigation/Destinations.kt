@@ -11,7 +11,10 @@ object Destinations {
     const val WORKOUTS_LIST = "workouts_list"
     const val ROUTE_CREATOR = "route_creator?routeId={routeId}"
     const val ROUTE_CREATOR_NEW = "route_creator"
+    const val WORKOUT_CREATOR = "workout_creator?workoutId={workoutId}"
+    const val WORKOUT_CREATOR_NEW = "workout_creator"
 
     fun ride(routeId: String) = "ride/$routeId"
     fun routeCreatorEdit(routeId: String) = "route_creator?routeId=$routeId"
+    fun workoutCreatorEdit(workoutId: String) = "workout_creator?workoutId=$workoutId"
 }
