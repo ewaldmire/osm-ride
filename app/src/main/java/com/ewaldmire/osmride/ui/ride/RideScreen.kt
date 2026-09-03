@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -76,6 +77,7 @@ fun RideScreen(
     val prefsContext = LocalContext.current
     var zoomLevel by remember { mutableStateOf(MapViewPrefs.getZoom(prefsContext)) }
     var headingUp by remember { mutableStateOf(MapViewPrefs.getHeadingUp(prefsContext)) }
+    var tilted by remember { mutableStateOf(MapViewPrefs.getTilted(prefsContext)) }
 
     LaunchedEffect(stats.state) {
         if (stats.state == RideState.FINISHED) onFinished()
@@ -111,12 +113,14 @@ fun RideScreen(
                 followBike = true,
                 zoomLevel = zoomLevel,
                 headingUp = headingUp,
+                tilted = tilted,
                 modifier = Modifier.fillMaxSize(),
             )
         }
 
         MapControls(
             headingUp = headingUp,
+            tilted = tilted,
             onZoomIn = {
                 zoomLevel = MapViewPrefs.clampZoom(zoomLevel + 1.0)
                 MapViewPrefs.setZoom(prefsContext, zoomLevel)
@@ -128,6 +132,10 @@ fun RideScreen(
             onToggleHeadingUp = {
                 headingUp = !headingUp
                 MapViewPrefs.setHeadingUp(prefsContext, headingUp)
+            },
+            onToggleTilt = {
+                tilted = !tilted
+                MapViewPrefs.setTilted(prefsContext, tilted)
             },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -284,9 +292,11 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 @Composable
 private fun MapControls(
     headingUp: Boolean,
+    tilted: Boolean,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onToggleHeadingUp: () -> Unit,
+    onToggleTilt: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -305,6 +315,16 @@ private fun MapControls(
             Icon(
                 Icons.Filled.Explore,
                 contentDescription = if (headingUp) "Switch to north-up" else "Switch to heading-up",
+            )
+        }
+        // Highlighted when tilt is off, since the tilted 3D chase-cam view is the default.
+        MapControlButton(
+            onClick = onToggleTilt,
+            highlighted = !tilted,
+        ) {
+            Icon(
+                Icons.Filled.Terrain,
+                contentDescription = if (tilted) "Switch to flat view" else "Switch to 3D view",
             )
         }
     }
@@ -338,6 +358,7 @@ private object MapViewPrefs {
     private const val PREFS_NAME = "map_view_prefs"
     private const val KEY_ZOOM = "zoom"
     private const val KEY_HEADING_UP = "heading_up"
+    private const val KEY_TILTED = "tilted"
     private const val DEFAULT_ZOOM = 18.0
     private const val MIN_ZOOM = 12.0
     private const val MAX_ZOOM = 20.0
@@ -353,6 +374,12 @@ private object MapViewPrefs {
 
     fun setHeadingUp(context: Context, headingUp: Boolean) {
         prefs(context).edit().putBoolean(KEY_HEADING_UP, headingUp).apply()
+    }
+
+    fun getTilted(context: Context): Boolean = prefs(context).getBoolean(KEY_TILTED, true)
+
+    fun setTilted(context: Context, tilted: Boolean) {
+        prefs(context).edit().putBoolean(KEY_TILTED, tilted).apply()
     }
 
     fun clampZoom(zoom: Double): Double = zoom.coerceIn(MIN_ZOOM, MAX_ZOOM)

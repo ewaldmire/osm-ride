@@ -32,6 +32,8 @@ import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
+import org.maplibre.android.style.layers.FillExtrusionLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -46,6 +48,20 @@ private const val ROUTE_LAYER_ID = "route-layer"
 private const val BIKE_SOURCE_ID = "bike-source"
 private const val BIKE_LAYER_ID = "bike-layer"
 private const val BIKE_ICON_ID = "bike-icon"
+
+/** Layer id of the 3D buildings baked into OpenFreeMap's "Liberty" style. */
+private const val BUILDING_3D_LAYER_ID = "building-3d"
+
+/** OSM's building:colour tag is too sparse to rely on, so buildings all render the same flat
+ * tone by default. Picking one of these by each building's render_height (mod 5) fakes enough
+ * variety to break up the monotony without needing real per-building color data. */
+private val BUILDING_COLORS = intArrayOf(
+    0xFFC9BBA8.toInt(), // warm beige
+    0xFFB8AFA0.toInt(), // warm gray
+    0xFFA79C8C.toInt(), // taupe
+    0xFFC08552.toInt(), // brick/terracotta
+    0xFF9C9186.toInt(), // cool gray
+)
 
 /** Pitch (degrees from straight-down) for the following camera - gives a 3D "chase cam" view of
  * buildings along the route instead of a flat top-down map. */
@@ -63,6 +79,7 @@ private const val RIDE_CAMERA_TOP_PADDING_FRACTION = 0.6
  *   buttons can adjust it and have it "stick".
  * @param headingUp true rotates the camera to match travel direction (bike always points up);
  *   false keeps the map north-up and only the bike icon itself rotates.
+ * @param tilted true uses a pitched 3D chase-cam view; false is a flat top-down view.
  */
 @Composable
 fun BikeMapView(
@@ -71,6 +88,7 @@ fun BikeMapView(
     followBike: Boolean,
     zoomLevel: Double,
     headingUp: Boolean,
+    tilted: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -104,6 +122,10 @@ fun BikeMapView(
             // duplicate it and stack awkwardly in the same corner.
             loadedMap.uiSettings.isAttributionEnabled = false
             loadedMap.uiSettings.isLogoEnabled = false
+            // Standard 3D map gestures: two-finger vertical drag tilts, two-finger twist rotates,
+            // pinch zooms - on by default, made explicit here since the tilt button above is the
+            // discoverable counterpart to the two-finger-drag tilt gesture.
+            loadedMap.uiSettings.isTiltGesturesEnabled = true
             loadedMap.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
                     manualOverrideActive = true
@@ -111,6 +133,7 @@ fun BikeMapView(
             }
             loadedMap.setStyle(Style.Builder().fromUri(ThreeDMapStyle.STYLE_URI)) { style ->
                 setUpRouteAndMarker(context, style, route)
+                applyBuildingColorVariety(style)
                 fitCameraToRoute(loadedMap, route)
             }
         }
@@ -120,12 +143,12 @@ fun BikeMapView(
     // A MapControls button tap is the only thing that changes zoomLevel/headingUp - use that as
     // the "revert to normal behavior" signal, distinct from the position-driven effect below
     // (which re-runs every tick and must not clear the override on its own).
-    DisposableEffect(zoomLevel, headingUp) {
+    DisposableEffect(zoomLevel, headingUp, tilted) {
         manualOverrideActive = false
         onDispose { }
     }
 
-    DisposableEffect(position, followBike, zoomLevel, headingUp, manualOverrideActive) {
+    DisposableEffect(position, followBike, zoomLevel, headingUp, tilted, manualOverrideActive) {
         if (position != null) {
             mapView.getMapAsync { map ->
                 val style = map.style ?: return@getMapAsync
@@ -142,13 +165,19 @@ fun BikeMapView(
                         // iconRotationAlignment(MAP) below, the bike icon then renders pointing
                         // straight up on screen, matching the rotated map underneath it).
                         // North-up: camera bearing stays fixed at 0 and only the icon rotates.
-                        val topPaddingPx = (mapView.height * RIDE_CAMERA_TOP_PADDING_FRACTION).toInt()
+                        // Padding is only meaningful while tilted (it's what reveals the horizon
+                        // above the bike), so it resets to 0 for a flat top-down view.
+                        val topPaddingPx = if (tilted) {
+                            (mapView.height * RIDE_CAMERA_TOP_PADDING_FRACTION).toInt()
+                        } else {
+                            0
+                        }
                         map.setPadding(0, topPaddingPx, 0, 0)
                         val cameraPosition = CameraPosition.Builder()
                             .target(LatLng(position.lat, position.lon))
                             .zoom(zoomLevel)
                             .bearing(if (headingUp) position.bearingDegrees else 0.0)
-                            .tilt(RIDE_CAMERA_TILT_DEGREES)
+                            .tilt(if (tilted) RIDE_CAMERA_TILT_DEGREES else 0.0)
                             .build()
                         map.easeCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 900)
                     }
@@ -197,6 +226,22 @@ private fun setUpRouteAndMarker(context: Context, style: Style, route: Route) {
             PropertyFactory.iconIgnorePlacement(true),
             PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
             PropertyFactory.iconRotate(0f),
+        ),
+    )
+}
+
+private fun applyBuildingColorVariety(style: Style) {
+    val buildingLayer = style.getLayerAs<FillExtrusionLayer>(BUILDING_3D_LAYER_ID) ?: return
+    val heightBucket = Expression.mod(
+        Expression.toNumber(Expression.get("render_height")),
+        Expression.literal(BUILDING_COLORS.size),
+    )
+    val colorStops = BUILDING_COLORS.mapIndexed { index, color ->
+        Expression.stop(index, Expression.color(color))
+    }.toTypedArray()
+    buildingLayer.setProperties(
+        PropertyFactory.fillExtrusionColor(
+            Expression.interpolate(Expression.linear(), heightBucket, *colorStops),
         ),
     )
 }
