@@ -175,7 +175,7 @@ fun RideScreen(
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
                     .padding(12.dp)
-                    .fillMaxWidth(0.4f),
+                    .fillMaxWidth(0.25f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 StatsCard(
@@ -184,6 +184,7 @@ fun RideScreen(
                     selectedWorkout = selectedWorkout,
                     gradeControlState = gradeControlState,
                     trainerConnected = trainerConnected,
+                    isLandscape = isLandscape,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 ActionCard(
@@ -202,6 +203,7 @@ fun RideScreen(
                 selectedWorkout = selectedWorkout,
                 gradeControlState = gradeControlState,
                 trainerConnected = trainerConnected,
+                isLandscape = isLandscape,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
@@ -242,8 +244,14 @@ private fun StatsCard(
     selectedWorkout: Workout?,
     gradeControlState: GradeControlState,
     trainerConnected: BleConnectionState,
+    isLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    // SpaceBetween looks right in portrait, where the card spans the full screen width - but in
+    // landscape's much narrower card, SpaceBetween stretches chips apart to fill that width,
+    // which is exactly the "white space" the card was accused of. Clustered spacing there instead.
+    val rowArrangement = if (isLandscape) Arrangement.spacedBy(14.dp) else Arrangement.SpaceBetween
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -264,7 +272,7 @@ private fun StatsCard(
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = rowArrangement,
             ) {
                 StatChip("Distance", Units.formatMiles(stats.distanceMeters))
                 StatChip("Time", Units.formatDuration(stats.elapsedSeconds))
@@ -272,7 +280,7 @@ private fun StatsCard(
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = rowArrangement,
             ) {
                 StatChip("Cadence", Units.formatCadence(stats.currentCadenceRpm))
                 StatChip("Power", Units.formatWatts(stats.currentPowerWatts?.toDouble()))
@@ -280,7 +288,7 @@ private fun StatsCard(
             }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = rowArrangement,
             ) {
                 StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
                 StatChip("ERG Target", Units.formatWatts(stats.currentTargetWatts?.toDouble()))
