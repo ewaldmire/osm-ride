@@ -99,9 +99,7 @@ class RoutesView(Gtk.Box):
         return row
 
     def _select(self, summary: RouteSummary) -> None:
-        # The ride screen (map + stats) doesn't exist yet - this is as far as route selection
-        # can go until it does.
-        self.window.show_placeholder("ride", f"Ride: {summary.name}")
+        self.window.show_ride(summary.id)
 
     def _rename(self, summary: RouteSummary) -> None:
         dialog = Gtk.Dialog(title="Rename Route", transient_for=self.window, modal=True)
