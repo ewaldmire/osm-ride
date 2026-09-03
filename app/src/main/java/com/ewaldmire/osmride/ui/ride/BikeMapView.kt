@@ -74,6 +74,11 @@ fun BikeMapView(route: Route, position: RidePosition?, followBike: Boolean, modi
 
     DisposableEffect(route.id) {
         mapView.getMapAsync { loadedMap ->
+            // MapLibre's default compass widget is positioned by fixed margins from the
+            // MapView's own top-right corner, which extends edge-to-edge under the status bar —
+            // it can't account for our Compose-side statusBarsPadding(), so it renders behind
+            // the status bar icons. We don't rely on manual map rotation, so just drop it.
+            loadedMap.uiSettings.isCompassEnabled = false
             loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE_JSON)) { style ->
                 setUpRouteAndMarker(context, style, route)
                 fitCameraToRoute(loadedMap, route)

@@ -16,7 +16,7 @@
         android:maxSdkVersion="30" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -42,10 +42,21 @@
             </intent-filter>
         </activity>
 
+        <!--
+          specialUse rather than connectedDevice: on Android 14+, connectedDevice-type foreground
+          services require BLUETOOTH_CONNECT (or similar) to be actually granted at
+          startForeground() time, not just declared — which crashed ride start when using the
+          simulated trainer (no real BLE, so that permission is never requested/granted).
+          specialUse has no such runtime-grant requirement.
+        -->
         <service
             android:name=".ride.RideForegroundService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="indoor-trainer-ride-tracking" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
