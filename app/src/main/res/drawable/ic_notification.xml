@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bike glyph is Google's "pedal_bike" Material Symbol (Apache 2.0), not hand-drawn. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:pathData="M8,16.5 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.6"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M16.5,16.5 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.6"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M8,16.5 L12,10 L16.5,16.5 M12,10 L10,16.5 M12,10 L14,10 L16.5,16.5"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="1.6"
-        android:fillColor="#00000000"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+    <group android:scaleX="0.025" android:scaleY="0.025">
+        <group android:translateY="960">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M194-160q-81 0-137.5-57T0-355q0-81 57-137.5T195-549q71 0 124.5 45.5T384-388h51l-82-232h-43q-13 0-21.5-8.5T280-650q0-13 8.5-21.5T310-680h128q13 0 21.5 8.5T468-650q0 13-8.5 21.5T438-620h-22l26 71h222l-71-191h-75q-13 0-21.5-8.5T488-770q0-13 8.5-21.5T518-800h69q24 0 40.5 11t24.5 33l76 207h38q81 0 137.5 56T960-357q0 81-56.5 139T766-160q-72 0-126-48t-66-120H384q-11 72-64.5 120T194-160Zm131-168v-60h-89q-13 0-21.5 8.5T206-358q0 13 8.5 21.5T236-328h89Zm174-60h76q4-23 15.5-51t31.5-50H463l36 101Zm191-81 33 86q5 11 15.5 16t22.5 1q12-4 17-15.5t1-22.5l-29-85-60 20Z" />
+        </group>
+    </group>
 </vector>

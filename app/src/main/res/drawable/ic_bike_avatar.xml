@@ -1,27 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bike glyph is Google's "pedal_bike" Material Symbol (Apache 2.0), not hand-drawn. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
-    android:viewportWidth="48"
-    android:viewportHeight="48">
+    android:viewportWidth="960"
+    android:viewportHeight="960">
     <path
-        android:pathData="M24,24 m-22,0 a22,22 0 1,0 44,0 a22,22 0 1,0 -44,0"
-        android:fillColor="#2E7D32" />
-    <path
-        android:pathData="M16,33 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.4"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M33,33 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.4"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M16,33 L24,20 L33,33 M24,20 L20,33 M24,20 L28,20 L33,33"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.4"
-        android:fillColor="#00000000"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:fillColor="#2E7D32"
+        android:pathData="M480,480m-480,0a480,480 0,1,1 960,0a480,480 0,1,1 -960,0" />
+    <group
+        android:pivotX="480"
+        android:pivotY="480"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
+        <group android:translateY="960">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M194-160q-81 0-137.5-57T0-355q0-81 57-137.5T195-549q71 0 124.5 45.5T384-388h51l-82-232h-43q-13 0-21.5-8.5T280-650q0-13 8.5-21.5T310-680h128q13 0 21.5 8.5T468-650q0 13-8.5 21.5T438-620h-22l26 71h222l-71-191h-75q-13 0-21.5-8.5T488-770q0-13 8.5-21.5T518-800h69q24 0 40.5 11t24.5 33l76 207h38q81 0 137.5 56T960-357q0 81-56.5 139T766-160q-72 0-126-48t-66-120H384q-11 72-64.5 120T194-160Zm131-168v-60h-89q-13 0-21.5 8.5T206-358q0 13 8.5 21.5T236-328h89Zm174-60h76q4-23 15.5-51t31.5-50H463l36 101Zm191-81 33 86q5 11 15.5 16t22.5 1q12-4 17-15.5t1-22.5l-29-85-60 20Z" />
+        </group>
+    </group>
 </vector>
