@@ -1,6 +1,8 @@
-"""Top-level window: a Gtk.Stack switches between full-screen views. Simpler than Android
-Navigation's back-stack - GTK apps don't have a system back button to wire up, and every screen
-here can always get back to history via the bottom bar, so a flat named-page stack is enough."""
+"""Top-level window: a Gtk.Stack switches between full-screen views, with a persistent
+BottomNavBar packed below it (hidden only on "ride" - the map needs the full window while
+riding). Simpler than Android Navigation's back-stack - GTK apps don't have a system back button
+to wire up, and every screen here can always get back to history via the bottom bar, so a flat
+named-page stack is enough."""
 
 from __future__ import annotations
 
@@ -9,6 +11,7 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk  # noqa: E402
 
+from .bottom_nav_bar import BottomNavBar
 from .history_view import HistoryView
 from .pairing_view import PairingView
 from .ride_view import RideView
@@ -25,8 +28,14 @@ class MainWindow(Gtk.ApplicationWindow):
         self.app = app
         self.set_default_size(1000, 700)
 
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(outer)
+
         self.stack = Gtk.Stack()
-        self.add(self.stack)
+        self.bottom_nav = BottomNavBar(self)
+        outer.pack_start(self.stack, True, True, 0)
+        outer.pack_start(self.bottom_nav, False, False, 0)
+        self.stack.connect("notify::visible-child-name", self._on_page_changed)
 
         self.history_view = HistoryView(self)
         self.stack.add_named(self.history_view, "history")
@@ -54,6 +63,11 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.stack.set_visible_child_name("history")
         self.show_all()
+
+    def _on_page_changed(self, _stack: Gtk.Stack, _pspec) -> None:  # noqa: ANN001
+        name = self.stack.get_visible_child_name()
+        self.bottom_nav.set_visible(name != "ride")
+        self.bottom_nav.set_active_page(name)
 
     def show_history(self) -> None:
         self.stack.set_visible_child_name("history")

@@ -1,5 +1,5 @@
-"""Home screen: ride history list + overview stats, with the four-button launcher bar (Settings/
-Workouts/Ride/Routes) at the bottom.
+"""Home screen: ride history list + overview stats. The four-button launcher bar (History/
+Routes/Workouts/Settings) lives at the MainWindow level now (see bottom_nav_bar.py), not here.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/history/RideHistoryScreen.kt.
 """
@@ -38,22 +38,9 @@ class HistoryView(Gtk.Box):
         scroller.set_vexpand(True)
         scroller.add(self._list_box)
 
-        bottom_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        bottom_bar.set_homogeneous(True)
-        for label, handler in [
-            ("Settings", window.show_settings),
-            ("Workouts", window.show_workouts),
-            ("Ride", window.show_routes),
-            ("Routes", window.show_routes),
-        ]:
-            button = Gtk.Button(label=label)
-            button.connect("clicked", lambda _b, h=handler: h())
-            bottom_bar.pack_start(button, True, True, 0)
-
         self.pack_start(title_label, False, False, 0)
         self.pack_start(self._overview_label, False, False, 0)
         self.pack_start(scroller, True, True, 0)
-        self.pack_start(bottom_bar, False, False, 0)
 
         # RideHistoryRepository does all its work synchronously on whatever thread calls it
         # (plain local file I/O, no BLE/network involved), and every call into it here comes
