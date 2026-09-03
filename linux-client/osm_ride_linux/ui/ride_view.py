@@ -25,7 +25,11 @@ from ..util import units  # noqa: E402
 from .ride_map_view import RideMapView  # noqa: E402
 from .workout_profile_chart import WorkoutProfileChart  # noqa: E402
 
-_FOLLOW_ZOOM = 16.0
+_DEFAULT_ZOOM = 16.0
+_MIN_ZOOM = 12.0
+_MAX_ZOOM = 20.0
+_DEFAULT_TILT_DEGREES = 55.0
+_MAX_TILT_DEGREES = 80.0
 
 
 class RideView(Gtk.Overlay):
@@ -37,11 +41,14 @@ class RideView(Gtk.Overlay):
         self._route: Route | None = None
         self._engine: RideEngine | None = None
         self._clock_tick_source: int | None = None
+        self._zoom_level = _DEFAULT_ZOOM
+        self._tilt_degrees = _DEFAULT_TILT_DEGREES
 
         self.map_view = RideMapView()
         self.add(self.map_view)
 
         self._build_stats_panel()
+        self._build_map_controls_panel()
         self._build_controls_panel()
 
     def _build_stats_panel(self) -> None:
@@ -82,6 +89,51 @@ class RideView(Gtk.Overlay):
         panel.add(box)
         self.add_overlay(panel)
 
+    def _build_map_controls_panel(self) -> None:
+        panel = Gtk.Frame()
+        panel.set_valign(Gtk.Align.CENTER)
+        panel.set_halign(Gtk.Align.END)
+        panel.set_margin_end(12)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(8)
+        box.set_margin_bottom(8)
+        box.set_margin_start(8)
+        box.set_margin_end(8)
+
+        zoom_in = Gtk.Button(label="+")
+        zoom_in.connect("clicked", lambda _b: self._adjust_zoom(1.0))
+        zoom_out = Gtk.Button(label="-")
+        zoom_out.connect("clicked", lambda _b: self._adjust_zoom(-1.0))
+
+        # GTK has a native vertical Scale, unlike Compose (which needed a hand-built drag
+        # control to avoid a rotated-Slider's touch-target pitfalls) - the real widget is the
+        # simpler option here.
+        tilt_label = Gtk.Label(label="Tilt")
+        self._tilt_scale = Gtk.Scale(orientation=Gtk.Orientation.VERTICAL)
+        self._tilt_scale.set_range(0, _MAX_TILT_DEGREES)
+        self._tilt_scale.set_value(self._tilt_degrees)
+        self._tilt_scale.set_inverted(True)  # top of the slider = more tilt
+        self._tilt_scale.set_draw_value(False)
+        self._tilt_scale.set_size_request(-1, 100)
+        self._tilt_scale.connect("value-changed", self._on_tilt_changed)
+
+        box.pack_start(zoom_in, False, False, 0)
+        box.pack_start(zoom_out, False, False, 0)
+        box.pack_start(tilt_label, False, False, 0)
+        box.pack_start(self._tilt_scale, True, True, 0)
+
+        panel.add(box)
+        self.add_overlay(panel)
+
+    def _adjust_zoom(self, delta: float) -> None:
+        self._zoom_level = min(max(self._zoom_level + delta, _MIN_ZOOM), _MAX_ZOOM)
+        self.map_view.reset_manual_override()
+
+    def _on_tilt_changed(self, scale: Gtk.Scale) -> None:
+        self._tilt_degrees = scale.get_value()
+        self.map_view.reset_manual_override()
+
     def _build_controls_panel(self) -> None:
         panel = Gtk.Frame()
         panel.set_valign(Gtk.Align.END)
@@ -98,9 +150,9 @@ class RideView(Gtk.Overlay):
 
         back = Gtk.Button(label="< Routes")
         back.set_valign(Gtk.Align.START)
-        back.set_halign(Gtk.Align.START)
+        back.set_halign(Gtk.Align.END)
         back.set_margin_top(12)
-        back.set_margin_start(12)
+        back.set_margin_end(12)
         back.connect("clicked", lambda _b: self.window.show_routes())
         self.add_overlay(back)
 
@@ -180,7 +232,11 @@ class RideView(Gtk.Overlay):
             self.map_view.update_bike_position(stats.position.lon, stats.position.lat)
             if stats.state == RideState.RIDING:
                 self.map_view.follow_bike(
-                    stats.position.lon, stats.position.lat, _FOLLOW_ZOOM, stats.position.bearing_degrees
+                    stats.position.lon,
+                    stats.position.lat,
+                    self._zoom_level,
+                    stats.position.bearing_degrees,
+                    self._tilt_degrees,
                 )
 
         self._send_trainer_control(stats)

@@ -12,15 +12,39 @@
 <body>
 <div id="map"></div>
 <script>
-  // Same free, no-API-key OpenFreeMap "Liberty" style used by the Android app's BikeMapView.kt.
+  // Same free, no-API-key OpenFreeMap "Liberty" style used by the Android app's BikeMapView.kt -
+  // it ships a "building-3d" fill-extrusion layer already, so tilting the camera is all that's
+  // needed to get 3D buildings; no new layer to add for that part.
+  const MAX_PITCH_DEGREES = 80;
+  // Fraction of the map's height reserved as top padding while following, at full tilt - pushes
+  // the camera's focal point toward the bottom of the screen so the bike renders "in the
+  // foreground" with the road ahead visible above it, instead of sitting dead-center. Mirrors
+  // BikeMapView.kt's RIDE_CAMERA_TOP_PADDING_FRACTION.
+  const TOP_PADDING_FRACTION = 0.6;
+  // OSM's building:colour tag is too sparse to rely on, so buildings all render the same flat
+  // tone by default - bucketing by each building's render_height fakes enough variety to break
+  // up the monotony. Same palette as BikeMapView.kt's BUILDING_COLORS.
+  const BUILDING_COLORS = ['#C9BBA8', '#B8AFA0', '#A79C8C', '#C08552', '#9C9186'];
+
   const map = new maplibregl.Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/liberty',
     center: [0, 0],
     zoom: 2,
   });
+  map.setMaxPitch(MAX_PITCH_DEGREES);
 
   window.mapReady = false;
+
+  // Set when a real touch/mouse gesture (not a programmatic easeTo/flyTo call) moves the camera -
+  // e.originalEvent is only present for user-driven interaction. While true, followBike()
+  // only recentres on the bike's position and leaves whatever zoom/bearing/tilt/rotation the
+  // rider set manually alone, mirroring BikeMapView.kt's manualOverrideActive. Cleared via
+  // window.resetManualOverride(), which the UI calls whenever a manual map control is used.
+  let manualOverrideActive = false;
+  map.on('movestart', (e) => {
+    if (e.originalEvent) manualOverrideActive = true;
+  });
 
   map.on('load', () => {
     map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -44,6 +68,19 @@
       },
     });
 
+    if (map.getLayer('building-3d')) {
+      map.setPaintProperty('building-3d', 'fill-extrusion-color', [
+        'interpolate',
+        ['linear'],
+        ['%', ['to-number', ['get', 'render_height']], BUILDING_COLORS.length],
+        0, BUILDING_COLORS[0],
+        1, BUILDING_COLORS[1],
+        2, BUILDING_COLORS[2],
+        3, BUILDING_COLORS[3],
+        4, BUILDING_COLORS[4],
+      ]);
+    }
+
     window.mapReady = true;
   });
 
@@ -56,6 +93,7 @@
       (b, c) => b.extend(c),
       new maplibregl.LngLatBounds(coords[0], coords[0])
     );
+    map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     map.fitBounds(bounds, { padding: 60, duration: 0 });
   };
 
@@ -67,8 +105,19 @@
     });
   };
 
-  window.followBike = function (lon, lat, zoom, bearing) {
-    map.easeTo({ center: [lon, lat], zoom: zoom, bearing: bearing, duration: 900 });
+  window.followBike = function (lon, lat, zoom, bearing, tiltDegrees) {
+    if (manualOverrideActive) {
+      map.easeTo({ center: [lon, lat], duration: 900 });
+      return;
+    }
+    const tiltFraction = Math.min(Math.max(tiltDegrees / MAX_PITCH_DEGREES, 0), 1);
+    const containerHeight = map.getContainer().clientHeight;
+    map.setPadding({ top: containerHeight * TOP_PADDING_FRACTION * tiltFraction, bottom: 0, left: 0, right: 0 });
+    map.easeTo({ center: [lon, lat], zoom: zoom, bearing: bearing, pitch: tiltDegrees, duration: 900 });
+  };
+
+  window.resetManualOverride = function () {
+    manualOverrideActive = false;
   };
 </script>
 </body>

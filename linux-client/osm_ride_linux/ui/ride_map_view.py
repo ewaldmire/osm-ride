@@ -1,6 +1,7 @@
 """Embeds the MapLibre GL JS map (map_assets/map.html) in a WebKit2 WebView and exposes a small
-Python API over it, mirroring the role BikeMapView.kt plays for the Android app - route line +
-bike marker for now; camera-follow, tilt, and 3D buildings come in a later pass.
+Python API over it, mirroring the role BikeMapView.kt plays for the Android app: route line, bike
+marker, camera-follow with tilt/3D buildings/padding, and sticking a manual gesture override until
+a UI control resets it.
 
 JS calls made before the page finishes loading are queued and flushed once it has - the page
 load is asynchronous and there's no guarantee the Python side won't call set_route() before
@@ -59,5 +60,8 @@ class RideMapView(Gtk.Box):
     def update_bike_position(self, lon: float, lat: float) -> None:
         self._run_js(f"window.updateBikePosition({lon}, {lat});")
 
-    def follow_bike(self, lon: float, lat: float, zoom: float, bearing: float) -> None:
-        self._run_js(f"window.followBike({lon}, {lat}, {zoom}, {bearing});")
+    def follow_bike(self, lon: float, lat: float, zoom: float, bearing: float, tilt_degrees: float) -> None:
+        self._run_js(f"window.followBike({lon}, {lat}, {zoom}, {bearing}, {tilt_degrees});")
+
+    def reset_manual_override(self) -> None:
+        self._run_js("window.resetManualOverride();")
