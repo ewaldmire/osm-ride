@@ -11,14 +11,18 @@ import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.ride.RideForegroundService
 import com.ewaldmire.osmride.ride.RideStats
 import com.ewaldmire.osmride.route.Route
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/**
+ * Thin, reattachable observer of the active [RideEngine] - [RideForegroundService] is what
+ * actually drives it (BLE samples + clock tick), so this ViewModel being torn down and recreated
+ * by navigation (e.g. the user backs out to fix a Bluetooth connection, then returns) doesn't
+ * lose or restart the ride: [loadRoute] reattaches to the existing engine for the same route
+ * instead of creating a new one.
+ */
 class RideViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as OsmRideApp
     private val routeRepository = app.routeRepository
@@ -36,35 +40,35 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
 
     private var engine: RideEngine? = null
     private var loadedRouteId: String? = null
-    private var tickerJob: Job? = null
 
     fun loadRoute(routeId: String) {
         if (loadedRouteId == routeId) return
         loadedRouteId = routeId
         viewModelScope.launch {
-            val loaded = routeRepository.loadRoute(routeId) ?: return@launch
-            _route.value = loaded
-            val newEngine = RideEngine(loaded)
-            engine = newEngine
-            app.currentRideEngine = newEngine
-            _stats.value = newEngine.stats.value
+            val existing = app.currentRideEngine
+            val activeEngine = if (existing != null && existing.route.id == routeId) {
+                // Ride already in progress for this route - reattach instead of restarting.
+                // The service is idempotent-safe to (re)start: it only subscribes its drive
+                // loop once per service lifetime, so this just confirms it's still running.
+                val context = getApplication<Application>()
+                ContextCompat.startForegroundService(context, Intent(context, RideForegroundService::class.java))
+                existing
+            } else {
+                val loaded = routeRepository.loadRoute(routeId) ?: return@launch
+                val newEngine = RideEngine(loaded)
+                app.currentRideEngine = newEngine
+                newEngine
+            }
 
-            viewModelScope.launch { newEngine.stats.collect { _stats.value = it } }
-            viewModelScope.launch { trainerManager.samples.collect { newEngine.onTrainerSample(it) } }
-            viewModelScope.launch { hrManager.samples.collect { newEngine.onHeartRateSample(it) } }
+            engine = activeEngine
+            _route.value = activeEngine.route
+            _stats.value = activeEngine.stats.value
+            viewModelScope.launch { activeEngine.stats.collect { _stats.value = it } }
         }
     }
 
     fun start() {
         engine?.start()
-        if (tickerJob == null) {
-            tickerJob = viewModelScope.launch {
-                while (isActive) {
-                    delay(1000)
-                    engine?.onClockTick()
-                }
-            }
-        }
         val context = getApplication<Application>()
         ContextCompat.startForegroundService(context, Intent(context, RideForegroundService::class.java))
     }
@@ -75,12 +79,5 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
 
     fun finishManually() {
         engine?.finishManually()
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        tickerJob?.cancel()
-        val context = getApplication<Application>()
-        context.stopService(Intent(context, RideForegroundService::class.java))
     }
 }

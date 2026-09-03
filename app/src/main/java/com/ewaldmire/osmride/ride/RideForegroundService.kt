@@ -11,30 +11,62 @@ import androidx.lifecycle.lifecycleScope
 import com.ewaldmire.osmride.MainActivity
 import com.ewaldmire.osmride.OsmRideApp
 import com.ewaldmire.osmride.R
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
- * Keeps the trainer BLE connection and ride clock alive while the screen is off, with a live
- * stats notification. Reads the shared [RideEngine] instance the ViewModel published on
- * [OsmRideApp.currentRideEngine] before starting this service.
+ * Owns driving the active ride: feeds trainer/HR BLE samples and a 1Hz clock tick into the
+ * shared [RideEngine] on [OsmRideApp.currentRideEngine], and shows a live stats notification.
+ *
+ * This runs independently of any UI screen. [com.ewaldmire.osmride.ui.ride.RideViewModel] is
+ * only a thin observer of the engine's stats and gets torn down/recreated by navigation like any
+ * other ViewModel - if that ViewModel were the one driving the engine (as it used to be), the
+ * ride would stop progressing (and its onCleared() would kill this service) the moment the user
+ * navigated away from the ride screen, e.g. to fix a Bluetooth connection. Keeping the drive loop
+ * here instead means the ride keeps going regardless, and the UI can reattach to it later.
  */
+@SuppressLint("MissingPermission")
 class RideForegroundService : LifecycleService() {
+    private var isDriving = false
 
-    @SuppressLint("MissingPermission")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         startForeground(NOTIFICATION_ID, buildNotification(0.0, 0L))
 
-        (application as OsmRideApp).currentRideEngine
-            ?.stats
-            ?.onEach { stats ->
-                val manager = NotificationManagerCompat.from(this)
-                manager.notify(NOTIFICATION_ID, buildNotification(stats.distanceMeters, stats.elapsedSeconds))
-            }
-            ?.launchIn(lifecycleScope)
+        if (!isDriving) {
+            isDriving = true
+            startDriving()
+        }
 
         return START_STICKY
+    }
+
+    private fun startDriving() {
+        val app = application as OsmRideApp
+        val engine = app.currentRideEngine ?: return
+
+        app.trainerBleManager.samples.onEach { engine.onTrainerSample(it) }.launchIn(lifecycleScope)
+        app.heartRateBleManager.samples.onEach { engine.onHeartRateSample(it) }.launchIn(lifecycleScope)
+
+        lifecycleScope.launch {
+            while (isActive) {
+                delay(1000)
+                engine.onClockTick()
+            }
+        }
+
+        engine.stats
+            .onEach { stats ->
+                val manager = NotificationManagerCompat.from(this)
+                manager.notify(NOTIFICATION_ID, buildNotification(stats.distanceMeters, stats.elapsedSeconds))
+                if (stats.state == RideState.FINISHED) {
+                    stopSelf()
+                }
+            }
+            .launchIn(lifecycleScope)
     }
 
     private fun buildNotification(distanceMeters: Double, elapsedSeconds: Long): Notification {
