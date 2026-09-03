@@ -9,6 +9,9 @@ object Destinations {
     const val HISTORY = "history"
     const val SETTINGS = "settings"
     const val WORKOUTS_LIST = "workouts_list"
+    const val ROUTE_CREATOR = "route_creator?routeId={routeId}"
+    const val ROUTE_CREATOR_NEW = "route_creator"
 
     fun ride(routeId: String) = "ride/$routeId"
+    fun routeCreatorEdit(routeId: String) = "route_creator?routeId=$routeId"
 }

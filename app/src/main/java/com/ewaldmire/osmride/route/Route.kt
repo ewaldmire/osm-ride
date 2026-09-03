@@ -27,4 +27,6 @@ data class RouteSummary(
     val totalDistanceMeters: Double,
     val elevationGainMeters: Double,
     val importedAtEpochMillis: Long,
+    /** Non-null only for routes built in-app with the route creator; used to reopen them for editing. */
+    val waypoints: List<RouteWaypoint>? = null,
 )

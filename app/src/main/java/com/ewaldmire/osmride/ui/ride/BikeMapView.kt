@@ -13,6 +13,7 @@ import android.content.Context
 import com.ewaldmire.osmride.R
 import com.ewaldmire.osmride.ride.RidePosition
 import com.ewaldmire.osmride.route.Route
+import com.ewaldmire.osmride.ui.map.OsmRasterStyle
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -34,28 +35,6 @@ private const val ROUTE_LAYER_ID = "route-layer"
 private const val BIKE_SOURCE_ID = "bike-source"
 private const val BIKE_LAYER_ID = "bike-layer"
 private const val BIKE_ICON_ID = "bike-icon"
-
-/** Plain raster style using standard OpenStreetMap tiles — no vector style/API key needed. */
-private const val OSM_RASTER_STYLE_JSON = """
-{
-  "version": 8,
-  "sources": {
-    "osm-raster": {
-      "type": "raster",
-      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      "tileSize": 256,
-      "attribution": "© OpenStreetMap contributors"
-    }
-  },
-  "layers": [
-    {
-      "id": "osm-raster-layer",
-      "type": "raster",
-      "source": "osm-raster"
-    }
-  ]
-}
-"""
 
 /**
  * MapLibre map showing the route polyline and a bike marker that follows live ride progress.
@@ -95,7 +74,7 @@ fun BikeMapView(
             // it can't account for our Compose-side statusBarsPadding(), so it renders behind
             // the status bar icons. We don't rely on manual map rotation, so just drop it.
             loadedMap.uiSettings.isCompassEnabled = false
-            loadedMap.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE_JSON)) { style ->
+            loadedMap.setStyle(Style.Builder().fromJson(OsmRasterStyle.JSON)) { style ->
                 setUpRouteAndMarker(context, style, route)
                 fitCameraToRoute(loadedMap, route)
             }

@@ -10,6 +10,7 @@ import androidx.navigation.navArgument
 import com.ewaldmire.osmride.ui.history.RideHistoryScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.ride.RideScreen
+import com.ewaldmire.osmride.ui.routecreator.RouteCreatorScreen
 import com.ewaldmire.osmride.ui.routes.RoutesListScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
 import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
@@ -27,7 +28,25 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
         composable(Destinations.ROUTES_LIST) {
             RoutesListScreen(
                 onRouteSelected = { routeId -> navController.navigate(Destinations.ride(routeId)) },
+                onCreateRoute = { navController.navigate(Destinations.ROUTE_CREATOR_NEW) },
+                onEditRoute = { routeId -> navController.navigate(Destinations.routeCreatorEdit(routeId)) },
                 onBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            Destinations.ROUTE_CREATOR,
+            arguments = listOf(
+                navArgument("routeId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            RouteCreatorScreen(
+                routeId = backStackEntry.arguments?.getString("routeId"),
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
             )
         }
         composable(Destinations.SETTINGS) {

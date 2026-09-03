@@ -8,7 +8,9 @@ exports a Strava-importable GPX of the completed ride.
 ## How it works
 
 - **Routes**: import `.gpx` files (exported from RideWithGPS, Strava routes, komoot, etc.) via
-  the in-app file picker. No routing backend — bring your own preplanned route.
+  the in-app file picker, or build one in-app with the route creator — tap waypoints on the map
+  and it auto-routes between them on real roads/paths via the free [BRouter](https://brouter.de)
+  routing API. Routes built this way can be reopened later to add/remove waypoints and re-route.
 - **Trainer connection**: scans for BLE devices advertising the Fitness Machine Service (FTMS,
   the modern standard most smart trainers speak) or, as a fallback, the Cycling Speed and
   Cadence (CSC) service.
@@ -44,7 +46,8 @@ release's APK automatically on each new push.
 
 ## Known limitations / deferred ideas
 
-- GPX import only — no in-app route builder/routing.
+- The in-app route creator's auto-routing depends on BRouter's free public API being reachable;
+  routes imported from a GPX file don't need it and always work offline.
 - Wheel circumference for the CSC-fallback distance calculation is a fixed constant
   (`BleConstants.DEFAULT_WHEEL_CIRCUMFERENCE_METERS`, 700x25c default) rather than a settings
   screen — most FTMS trainers report distance directly and don't need it.
@@ -52,6 +55,5 @@ release's APK automatically on each new push.
 - GPX export includes heart rate and cadence but not power (no standard GPX field for it);
   a TCX export would let power ride along too.
 - Discussed but not built: auto-pause when stopped, an elevation-profile strip on the ride
-  screen, structured/ERG-mode workouts (trainer holds a target power through timed intervals,
-  as opposed to the route-grade simulation that's already in), personal records and a "ghost"
-  pacer against a previous ride of the same route.
+  screen, personal records and a "ghost" pacer against a previous ride of the same route, a
+  Street View visual mode as an alternative to the OSM map.

@@ -79,6 +79,54 @@ class RouteRepository(context: Context) {
         )
     }
 
+    /**
+     * Saves a route built (or edited) in-app via the route creator. Pass [existingId] when
+     * re-routing an already-created route so it updates in place instead of duplicating.
+     */
+    suspend fun saveCreatedRoute(
+        existingId: String?,
+        name: String,
+        gpxContent: String,
+        waypoints: List<RouteWaypoint>,
+    ): Result<RouteSummary> = withContext(Dispatchers.IO) {
+        try {
+            val id = existingId ?: UUID.randomUUID().toString()
+            val destFile = File(routesDir, "$id.gpx")
+            destFile.writeText(gpxContent)
+
+            val parsed = destFile.inputStream().use { GpxParser.parse(it) }
+            if (parsed.points.size < 2) {
+                destFile.delete()
+                return@withContext Result.failure(
+                    IllegalArgumentException("Route has no usable track points"),
+                )
+            }
+
+            val existing = _routes.value.find { it.id == id }
+            val summary = RouteSummary(
+                id = id,
+                name = name.trim().ifEmpty { "New Route" },
+                fileName = destFile.name,
+                totalDistanceMeters = parsed.totalDistanceMeters,
+                elevationGainMeters = parsed.elevationGainMeters,
+                importedAtEpochMillis = existing?.importedAtEpochMillis ?: System.currentTimeMillis(),
+                waypoints = waypoints,
+            )
+            val updated = if (existing != null) {
+                _routes.value.map { if (it.id == id) summary else it }
+            } else {
+                _routes.value + summary
+            }
+            _routes.value = updated
+            saveIndex(updated)
+            Result.success(summary)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun getRouteSummary(id: String): RouteSummary? = _routes.value.find { it.id == id }
+
     suspend fun renameRoute(id: String, name: String) = withContext(Dispatchers.IO) {
         val resolved = name.ifBlank { return@withContext }
         val updated = _routes.value.map { if (it.id == id) it.copy(name = resolved) else it }

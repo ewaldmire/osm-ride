@@ -15,10 +15,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddRoad
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,6 +58,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun RoutesListScreen(
     onRouteSelected: (String) -> Unit,
+    onCreateRoute: () -> Unit,
+    onEditRoute: (String) -> Unit,
     onBack: () -> Unit,
     viewModel: RoutesListViewModel = viewModel(),
 ) {
@@ -103,8 +107,13 @@ fun RoutesListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
-                Icon(Icons.Filled.Add, contentDescription = "Import GPX route")
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                FloatingActionButton(onClick = onCreateRoute) {
+                    Icon(Icons.Filled.AddRoad, contentDescription = "Create route")
+                }
+                FloatingActionButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Import GPX route")
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
@@ -138,6 +147,7 @@ fun RoutesListScreen(
                         route = route,
                         onClick = { selectRoute(route.id) },
                         onRename = { renamingRoute = route },
+                        onEditRoute = { onEditRoute(route.id) },
                         onDelete = { viewModel.deleteRoute(route.id) },
                     )
                 }
@@ -179,7 +189,13 @@ private fun EmptyState(padding: PaddingValues) {
 }
 
 @Composable
-private fun RouteCard(route: RouteSummary, onClick: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit) {
+private fun RouteCard(
+    route: RouteSummary,
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onEditRoute: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -194,6 +210,11 @@ private fun RouteCard(route: RouteSummary, onClick: () -> Unit, onRename: () -> 
                 )
             }
             Row {
+                if (route.waypoints != null) {
+                    IconButton(onClick = onEditRoute) {
+                        Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
+                    }
+                }
                 IconButton(onClick = onRename) {
                     Icon(Icons.Filled.Edit, contentDescription = "Rename route")
                 }
