@@ -45,11 +45,14 @@ class WorkoutsView(Gtk.Box):
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         back = Gtk.Button(label="< Back")
         back.connect("clicked", lambda _b: window.show_history())
+        create_button = Gtk.Button(label="Create Workout...")
+        create_button.connect("clicked", lambda _b: window.show_workout_creator_new())
         import_button = Gtk.Button(label="Import Workout...")
         import_button.connect("clicked", self._on_import_clicked)
         header.pack_start(back, False, False, 0)
         header.pack_start(Gtk.Label(label="Workout Library"), False, False, 0)
         header.pack_end(import_button, False, False, 0)
+        header.pack_end(create_button, False, False, 0)
 
         self._empty_label = Gtk.Label(label="No workouts yet. Import an .erg, .mrc, or .zwo file.")
         self._list_box = Gtk.ListBox()
@@ -93,10 +96,13 @@ class WorkoutsView(Gtk.Box):
         info_box.pack_start(Gtk.Label(label=summary_text, xalign=0.0), False, False, 0)
         top_row.pack_start(info_box, True, True, 0)
 
+        edit_blocks_button = Gtk.Button(label="Edit Blocks")
+        edit_blocks_button.connect("clicked", lambda _b, w=workout: self.window.show_workout_creator_edit(w.id))
         rename_button = Gtk.Button(label="Rename")
         rename_button.connect("clicked", lambda _b, w=workout: self._rename(w))
         delete_button = Gtk.Button(label="Delete")
         delete_button.connect("clicked", lambda _b, w=workout: self._delete(w))
+        top_row.pack_start(edit_blocks_button, False, False, 0)
         top_row.pack_start(rename_button, False, False, 0)
         top_row.pack_start(delete_button, False, False, 0)
 
