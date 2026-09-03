@@ -21,8 +21,10 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = Destinations.HISTORY) {
         composable(Destinations.HISTORY) {
             RideHistoryScreen(
-                onNewRide = { navController.navigate(Destinations.ROUTES_LIST) },
                 onOpenSettings = { navController.navigate(Destinations.SETTINGS) },
+                onOpenWorkouts = { navController.navigate(Destinations.WORKOUTS_LIST) },
+                onNewRide = { navController.navigate(Destinations.ROUTES_LIST) },
+                onOpenRoutes = { navController.navigate(Destinations.ROUTES_LIST) },
             )
         }
         composable(Destinations.ROUTES_LIST) {
