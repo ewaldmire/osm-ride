@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,6 +51,11 @@ private const val BIKE_ICON_ID = "bike-icon"
  * buildings along the route instead of a flat top-down map. */
 private const val RIDE_CAMERA_TILT_DEGREES = 55.0
 
+/** Fraction of the map's height reserved as top padding while following - this recentres the
+ * camera's focal point toward the bottom of the screen, so the bike renders "in the foreground"
+ * with the road/horizon ahead of it visible above, instead of sitting dead-center. */
+private const val RIDE_CAMERA_TOP_PADDING_FRACTION = 0.6
+
 /**
  * MapLibre map showing the route polyline and a bike marker that follows live ride progress.
  *
@@ -69,6 +77,12 @@ fun BikeMapView(
 
     val mapView = remember { MapView(context) }
 
+    // True once the rider has manually pinch-zoomed/rotated/tilted the map - while true, the
+    // follow-camera stops overriding zoom/bearing/tilt every tick (just keeps recentring on the
+    // bike) so the manual adjustment "sticks". Cleared below whenever zoomLevel/headingUp
+    // actually change, i.e. whenever a MapControls button is tapped.
+    var manualOverrideActive by remember { mutableStateOf(false) }
+
     DisposableEffect(Unit) {
         mapView.onStart()
         mapView.onResume()
@@ -86,6 +100,15 @@ fun BikeMapView(
             // it can't account for our Compose-side statusBarsPadding(), so it renders behind
             // the status bar icons. We don't rely on manual map rotation, so just drop it.
             loadedMap.uiSettings.isCompassEnabled = false
+            // We show our own compact attribution text below instead - the native widgets
+            // duplicate it and stack awkwardly in the same corner.
+            loadedMap.uiSettings.isAttributionEnabled = false
+            loadedMap.uiSettings.isLogoEnabled = false
+            loadedMap.addOnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                    manualOverrideActive = true
+                }
+            }
             loadedMap.setStyle(Style.Builder().fromUri(ThreeDMapStyle.STYLE_URI)) { style ->
                 setUpRouteAndMarker(context, style, route)
                 fitCameraToRoute(loadedMap, route)
@@ -94,23 +117,41 @@ fun BikeMapView(
         onDispose { }
     }
 
-    DisposableEffect(position, followBike, zoomLevel, headingUp) {
+    // A MapControls button tap is the only thing that changes zoomLevel/headingUp - use that as
+    // the "revert to normal behavior" signal, distinct from the position-driven effect below
+    // (which re-runs every tick and must not clear the override on its own).
+    DisposableEffect(zoomLevel, headingUp) {
+        manualOverrideActive = false
+        onDispose { }
+    }
+
+    DisposableEffect(position, followBike, zoomLevel, headingUp, manualOverrideActive) {
         if (position != null) {
             mapView.getMapAsync { map ->
                 val style = map.style ?: return@getMapAsync
                 updateBikePosition(style, position)
                 if (followBike) {
-                    // Heading-up: rotate the camera to match travel direction (paired with
-                    // iconRotationAlignment(MAP) below, the bike icon then renders pointing
-                    // straight up on screen, matching the rotated map underneath it). North-up:
-                    // camera bearing stays fixed at 0 and only the icon itself rotates.
-                    val cameraPosition = CameraPosition.Builder()
-                        .target(LatLng(position.lat, position.lon))
-                        .zoom(zoomLevel)
-                        .bearing(if (headingUp) position.bearingDegrees else 0.0)
-                        .tilt(RIDE_CAMERA_TILT_DEGREES)
-                        .build()
-                    map.easeCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 900)
+                    if (manualOverrideActive) {
+                        // Keep whatever zoom/bearing/tilt the rider set manually; just recentre.
+                        map.easeCamera(
+                            CameraUpdateFactory.newLatLng(LatLng(position.lat, position.lon)),
+                            900,
+                        )
+                    } else {
+                        // Heading-up: rotate the camera to match travel direction (paired with
+                        // iconRotationAlignment(MAP) below, the bike icon then renders pointing
+                        // straight up on screen, matching the rotated map underneath it).
+                        // North-up: camera bearing stays fixed at 0 and only the icon rotates.
+                        val topPaddingPx = (mapView.height * RIDE_CAMERA_TOP_PADDING_FRACTION).toInt()
+                        map.setPadding(0, topPaddingPx, 0, 0)
+                        val cameraPosition = CameraPosition.Builder()
+                            .target(LatLng(position.lat, position.lon))
+                            .zoom(zoomLevel)
+                            .bearing(if (headingUp) position.bearingDegrees else 0.0)
+                            .tilt(RIDE_CAMERA_TILT_DEGREES)
+                            .build()
+                        map.easeCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 900)
+                    }
                 }
             }
         }
@@ -169,6 +210,7 @@ private fun updateBikePosition(style: Style, position: RidePosition) {
 
 private fun fitCameraToRoute(map: MapLibreMap, route: Route) {
     if (route.points.size < 2) return
+    map.setPadding(0, 0, 0, 0)
     val boundsBuilder = LatLngBounds.Builder()
     route.points.forEach { boundsBuilder.include(LatLng(it.lat, it.lon)) }
     map.moveCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 96))

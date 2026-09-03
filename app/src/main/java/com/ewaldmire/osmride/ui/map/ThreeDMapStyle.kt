@@ -8,6 +8,7 @@ package com.ewaldmire.osmride.ui.map
 object ThreeDMapStyle {
     const val STYLE_URI = "https://tiles.openfreemap.org/styles/liberty"
 
-    /** Required attribution text per https://openfreemap.org/quick_start/ - must stay visible on screen. */
-    const val ATTRIBUTION = "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"
+    /** Compact form of the attribution required by https://openfreemap.org/quick_start/ - credits
+     * the same three parties (OpenStreetMap, OpenMapTiles, OpenFreeMap) in less on-screen space. */
+    const val ATTRIBUTION = "© OSM · OpenMapTiles · OpenFreeMap"
 }
