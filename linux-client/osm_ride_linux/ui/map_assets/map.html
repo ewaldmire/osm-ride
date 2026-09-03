@@ -68,6 +68,20 @@
       },
     });
 
+    // Route creator only - tapped waypoint dots, mirroring RouteCreatorMapView.kt's CircleLayer.
+    map.addSource('waypoints', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'waypoint-dots',
+      type: 'circle',
+      source: 'waypoints',
+      paint: {
+        'circle-radius': 7,
+        'circle-color': '#1976D2',
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 2,
+      },
+    });
+
     if (map.getLayer('building-3d')) {
       map.setPaintProperty('building-3d', 'fill-extrusion-color', [
         'interpolate',
@@ -118,6 +132,30 @@
 
   window.resetManualOverride = function () {
     manualOverrideActive = false;
+  };
+
+  // Route creator only. Off by default (window.enableCreatorMode() turns it on) so the ride
+  // screen - which loads this same page but never calls that - doesn't post messages into a
+  // handler it never registered.
+  window.creatorModeEnabled = false;
+  window.enableCreatorMode = function () {
+    window.creatorModeEnabled = true;
+  };
+  map.on('click', (e) => {
+    if (!window.creatorModeEnabled) return;
+    window.webkit.messageHandlers.waypointTapped.postMessage(
+      JSON.stringify({ lon: e.lngLat.lng, lat: e.lngLat.lat })
+    );
+  });
+
+  window.setWaypoints = function (geojson) {
+    map.getSource('waypoints').setData(geojson);
+  };
+
+  // Same shape as setRoute, but without recentring on every call - the rider is actively
+  // tapping the map and a fitBounds jump after each tap would fight their own panning/zooming.
+  window.setPreviewRoute = function (geojson) {
+    map.getSource('route').setData(geojson);
   };
 </script>
 </body>

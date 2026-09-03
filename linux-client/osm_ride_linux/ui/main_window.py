@@ -12,6 +12,7 @@ from gi.repository import Gtk  # noqa: E402
 from .history_view import HistoryView
 from .pairing_view import PairingView
 from .ride_view import RideView
+from .route_creator_view import RouteCreatorView
 from .routes_view import RoutesView
 from .settings_view import SettingsView
 from .workouts_view import WorkoutsView
@@ -44,6 +45,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.ride_view = RideView(self)
         self.stack.add_named(self.ride_view, "ride")
 
+        self.route_creator_view = RouteCreatorView(self)
+        self.stack.add_named(self.route_creator_view, "route_creator")
+
         self.stack.set_visible_child_name("history")
         self.show_all()
 
@@ -65,6 +69,14 @@ class MainWindow(Gtk.ApplicationWindow):
     def show_ride(self, route_id: str) -> None:
         self.ride_view.load_route(route_id)
         self.stack.set_visible_child_name("ride")
+
+    def show_route_creator_new(self) -> None:
+        self.route_creator_view.start_new()
+        self.stack.set_visible_child_name("route_creator")
+
+    def show_route_creator_edit(self, route_id: str) -> None:
+        self.route_creator_view.start_edit(route_id)
+        self.stack.set_visible_child_name("route_creator")
 
     def show_placeholder(self, name: str, title: str) -> None:
         """Temporary stand-in for screens not built yet (Routes/Workouts/Settings/Ride) - a

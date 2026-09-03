@@ -34,11 +34,14 @@ class RoutesView(Gtk.Box):
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         back = Gtk.Button(label="< Back")
         back.connect("clicked", lambda _b: window.show_history())
+        create_button = Gtk.Button(label="Create Route...")
+        create_button.connect("clicked", lambda _b: window.show_route_creator_new())
         import_button = Gtk.Button(label="Import GPX...")
         import_button.connect("clicked", self._on_import_clicked)
         header.pack_start(back, False, False, 0)
         header.pack_start(Gtk.Label(label="Routes"), False, False, 0)
         header.pack_end(import_button, False, False, 0)
+        header.pack_end(create_button, False, False, 0)
 
         self._empty_label = Gtk.Label(label="No routes yet. Import a GPX file to get started.")
         self._list_box = Gtk.ListBox()
@@ -93,6 +96,12 @@ class RoutesView(Gtk.Box):
         delete_button.connect("clicked", lambda _b, s=summary: self._delete(s))
 
         outer.pack_start(select_button, True, True, 0)
+        # Only routes built in-app carry a waypoint list to re-route from - plain GPX imports
+        # have nothing for the creator to reopen.
+        if summary.waypoints is not None:
+            edit_button = Gtk.Button(label="Edit Route")
+            edit_button.connect("clicked", lambda _b, s=summary: self.window.show_route_creator_edit(s.id))
+            outer.pack_start(edit_button, False, False, 0)
         outer.pack_start(rename_button, False, False, 0)
         outer.pack_start(delete_button, False, False, 0)
         row.add(outer)
