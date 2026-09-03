@@ -145,9 +145,19 @@ fun RideScreen(
                 tiltDegrees = MapViewPrefs.clampTilt(newTilt)
                 MapViewPrefs.setTiltDegrees(prefsContext, tiltDegrees)
             },
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp),
+            // Landscape is short enough that a vertically-centered control cluster (now 4 items
+            // tall, including the tilt slider) can collide with the bottom-right pause/finish
+            // card and get hidden behind it - anchor to the top-right there instead.
+            modifier = if (isLandscape) {
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp, end = 16.dp)
+            } else {
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 16.dp)
+            },
         )
 
         Box(
