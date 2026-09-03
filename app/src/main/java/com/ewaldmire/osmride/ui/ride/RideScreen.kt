@@ -6,10 +6,12 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,7 +36,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -59,7 +61,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ble.BleConnectionState
 import com.ewaldmire.osmride.ble.GradeControlState
 import com.ewaldmire.osmride.ride.RideState
+import com.ewaldmire.osmride.ride.RideStats
 import com.ewaldmire.osmride.ride.Workout
+import com.ewaldmire.osmride.route.Route
 import com.ewaldmire.osmride.ui.workout.WorkoutProfileChart
 import com.ewaldmire.osmride.util.Units
 
@@ -145,19 +149,11 @@ fun RideScreen(
                 tiltDegrees = MapViewPrefs.clampTilt(newTilt)
                 MapViewPrefs.setTiltDegrees(prefsContext, tiltDegrees)
             },
-            // Landscape is short enough that a vertically-centered control cluster (now 4 items
-            // tall, including the tilt slider) can collide with the bottom-right pause/finish
-            // card and get hidden behind it - anchor to the top-right there instead.
-            modifier = if (isLandscape) {
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 12.dp, end = 16.dp)
-            } else {
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp)
-            },
+            // Pause/finish moves under the stats card on the left in landscape (below), so the
+            // whole right side is free for these controls in both orientations.
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
         )
 
         Box(
@@ -171,121 +167,59 @@ fun RideScreen(
                 ),
         )
 
-        // In landscape, a full-width stats card (like portrait's) would cover most of the map -
-        // dock it to the left as a narrower column instead, matching the pause/finish card
-        // moving to the right, so the map stays visible in between.
-        Surface(
-            modifier = if (isLandscape) {
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxWidth(0.42f)
+        if (isLandscape) {
+            // Stack stats + pause/finish together on the left so the entire right side stays
+            // free for MapControls, instead of splitting left/right and cramping both.
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
                     .statusBarsPadding()
                     .padding(12.dp)
-            } else {
-                Modifier
+                    .fillMaxWidth(0.4f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StatsCard(
+                    stats = stats,
+                    currentRoute = currentRoute,
+                    selectedWorkout = selectedWorkout,
+                    gradeControlState = gradeControlState,
+                    trainerConnected = trainerConnected,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ActionCard(
+                    stats = stats,
+                    selectedWorkout = selectedWorkout,
+                    isLandscape = isLandscape,
+                    viewModel = viewModel,
+                    onChooseWorkout = { showWorkoutPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        } else {
+            StatsCard(
+                stats = stats,
+                currentRoute = currentRoute,
+                selectedWorkout = selectedWorkout,
+                gradeControlState = gradeControlState,
+                trainerConnected = trainerConnected,
+                modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(12.dp)
-            },
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-            shadowElevation = 4.dp,
-        ) {
-            Column(modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
-                LinearProgressIndicator(
-                    progress = { stats.progressFraction.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                currentRoute?.let { route ->
-                    ElevationProfileChart(
-                        route = route,
-                        progressMeters = stats.distanceMeters,
-                        modifier = Modifier.fillMaxWidth().height(36.dp).padding(top = 8.dp),
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    StatChip("Distance", Units.formatMiles(stats.distanceMeters))
-                    StatChip("Time", Units.formatDuration(stats.elapsedSeconds))
-                    StatChip("Speed", Units.formatMph(stats.currentSpeedMps))
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    StatChip("Cadence", Units.formatCadence(stats.currentCadenceRpm))
-                    StatChip("Power", Units.formatWatts(stats.currentPowerWatts?.toDouble()))
-                    StatChip("Heart Rate", Units.formatHeartRate(stats.currentHeartRateBpm))
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
-                    StatChip("ERG Target", Units.formatWatts(stats.currentTargetWatts?.toDouble()))
-                }
-                selectedWorkout?.let { workout ->
-                    WorkoutProfileChart(
-                        workout = workout,
-                        progressSeconds = stats.elapsedSeconds,
-                        modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 8.dp),
-                    )
-                }
-                controlStatusText(gradeControlState, stats.currentTargetWatts != null)?.let { statusText ->
-                    Text(
-                        statusText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                if (trainerConnected != BleConnectionState.CONNECTED) {
-                    Text(
-                        "Trainer not connected — pair it first to track distance.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-            }
-        }
-
-        // Landscape mirrors the stats card: dock to the right as a narrower column instead of
-        // spanning the full width, so it doesn't cover the map.
-        Card(
-            modifier = if (isLandscape) {
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .fillMaxWidth(0.32f)
-                    .navigationBarsPadding()
-                    .padding(16.dp)
-            } else {
-                Modifier
+                    .padding(12.dp),
+            )
+            ActionCard(
+                stats = stats,
+                selectedWorkout = selectedWorkout,
+                isLandscape = isLandscape,
+                viewModel = viewModel,
+                onChooseWorkout = { showWorkoutPicker = true },
+                modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(16.dp)
-            },
-        ) {
-            if (stats.state == RideState.IDLE) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Workout: ${selectedWorkout?.name ?: "None"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    TextButton(onClick = { showWorkoutPicker = true }) {
-                        Text(if (selectedWorkout == null) "Choose" else "Change")
-                    }
-                }
-            }
-            RideActionButtons(state = stats.state, isLandscape = isLandscape, viewModel = viewModel)
+                    .padding(16.dp),
+            )
         }
     }
 
@@ -298,6 +232,112 @@ fun RideScreen(
             },
             onDismiss = { showWorkoutPicker = false },
         )
+    }
+}
+
+@Composable
+private fun StatsCard(
+    stats: RideStats,
+    currentRoute: Route?,
+    selectedWorkout: Workout?,
+    gradeControlState: GradeControlState,
+    trainerConnected: BleConnectionState,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        shadowElevation = 4.dp,
+    ) {
+        Column(modifier = Modifier.padding(10.dp).verticalScroll(rememberScrollState())) {
+            LinearProgressIndicator(
+                progress = { stats.progressFraction.toFloat() },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            currentRoute?.let { route ->
+                ElevationProfileChart(
+                    route = route,
+                    progressMeters = stats.distanceMeters,
+                    modifier = Modifier.fillMaxWidth().height(20.dp).padding(top = 4.dp),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                StatChip("Distance", Units.formatMiles(stats.distanceMeters))
+                StatChip("Time", Units.formatDuration(stats.elapsedSeconds))
+                StatChip("Speed", Units.formatMph(stats.currentSpeedMps))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                StatChip("Cadence", Units.formatCadence(stats.currentCadenceRpm))
+                StatChip("Power", Units.formatWatts(stats.currentPowerWatts?.toDouble()))
+                StatChip("Heart Rate", Units.formatHeartRate(stats.currentHeartRateBpm))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
+                StatChip("ERG Target", Units.formatWatts(stats.currentTargetWatts?.toDouble()))
+            }
+            selectedWorkout?.let { workout ->
+                WorkoutProfileChart(
+                    workout = workout,
+                    progressSeconds = stats.elapsedSeconds,
+                    modifier = Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp),
+                )
+            }
+            controlStatusText(gradeControlState, stats.currentTargetWatts != null)?.let { statusText ->
+                Text(
+                    statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (trainerConnected != BleConnectionState.CONNECTED) {
+                Text(
+                    "Trainer not connected — pair it first to track distance.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionCard(
+    stats: RideStats,
+    selectedWorkout: Workout?,
+    isLandscape: Boolean,
+    viewModel: RideViewModel,
+    onChooseWorkout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
+        if (stats.state == RideState.IDLE) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Workout: ${selectedWorkout?.name ?: "None"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                TextButton(onClick = onChooseWorkout) {
+                    Text(if (selectedWorkout == null) "Choose" else "Change")
+                }
+            }
+        }
+        RideActionButtons(state = stats.state, isLandscape = isLandscape, viewModel = viewModel)
     }
 }
 
@@ -382,7 +422,11 @@ private fun MapControls(
     onTiltChanged: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         MapControlButton(onClick = onZoomIn) {
             Icon(Icons.Filled.Add, contentDescription = "Zoom in")
         }
@@ -407,29 +451,59 @@ private fun MapControls(
     }
 }
 
+/** A vertical drag track (drag up = more tilt) rather than a Material Slider - it reads more
+ * naturally as "tilt" next to the round zoom/heading buttons, and takes far less width than a
+ * horizontal slider would in the same column. */
 @Composable
 private fun TiltSlider(tiltDegrees: Float, onTiltChanged: (Float) -> Unit) {
+    val maxTilt = RIDE_CAMERA_MAX_PITCH_DEGREES.toFloat()
     // Local copy so dragging feels immediate; the real tiltDegrees (and the map update it
     // triggers) only commits on release, so a fast drag doesn't queue up a pile of camera
     // animations fighting each other.
     var sliderPosition by remember(tiltDegrees) { mutableStateOf(tiltDegrees) }
+    val fraction = (sliderPosition / maxTilt).coerceIn(0f, 1f)
+
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         shadowElevation = 4.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(Icons.Filled.Terrain, contentDescription = "Camera tilt")
-            Slider(
-                value = sliderPosition,
-                onValueChange = { sliderPosition = it },
-                onValueChangeFinished = { onTiltChanged(sliderPosition) },
-                valueRange = 0f..RIDE_CAMERA_MAX_PITCH_DEGREES.toFloat(),
-                modifier = Modifier.width(120.dp),
-            )
+            Icon(Icons.Filled.Terrain, contentDescription = "Camera tilt", modifier = Modifier.size(16.dp))
+            Box(
+                modifier = Modifier
+                    .width(28.dp)
+                    .height(84.dp)
+                    .pointerInput(maxTilt) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                val delta = (-dragAmount / size.height) * maxTilt
+                                sliderPosition = (sliderPosition + delta).coerceIn(0f, maxTilt)
+                            },
+                            onDragEnd = { onTiltChanged(sliderPosition) },
+                        )
+                    },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .width(4.dp)
+                        .fillMaxHeight(fraction)
+                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                )
+            }
         }
     }
 }
@@ -537,7 +611,7 @@ private fun WorkoutPickerDialog(workouts: List<Workout>, onSelect: (String?) -> 
 @Composable
 private fun StatChip(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.titleMedium)
+        Text(value, style = MaterialTheme.typography.titleSmall)
         Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
