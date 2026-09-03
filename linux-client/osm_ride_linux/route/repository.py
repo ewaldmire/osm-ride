@@ -13,7 +13,7 @@ import os
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from . import gpx as gpx_module
@@ -86,9 +86,7 @@ class RouteRepository:
         resolved = name.strip()
         if not resolved:
             return
-        updated = [
-            RouteSummary(**{**asdict(r), "name": resolved}) if r.id == route_id else r for r in self.routes
-        ]
+        updated = [replace(r, name=resolved) if r.id == route_id else r for r in self.routes]
         self._update_routes(updated)
 
     def delete_route(self, route_id: str) -> None:
