@@ -42,13 +42,16 @@ To track it with [Obtainium](https://github.com/ImranR98/Obtainium) on your phon
 as an "Add App" source using the GitHub Releases source — Obtainium will pick up the latest
 release's APK automatically on each new push.
 
-## Known limitations (v1)
+## Known limitations / deferred ideas
 
 - GPX import only — no in-app route builder/routing.
-- Ride progress lives in the screen's ViewModel, not the foreground service; if Android kills
-  the app process entirely while backgrounded mid-ride (rare, but possible under memory
-  pressure), that ride's progress is lost. The BLE connection + notification staying alive via
-  the foreground service is what makes screen-off during a normal ride safe.
 - Wheel circumference for the CSC-fallback distance calculation is a fixed constant
   (`BleConstants.DEFAULT_WHEEL_CIRCUMFERENCE_METERS`, 700x25c default) rather than a settings
   screen — most FTMS trainers report distance directly and don't need it.
+- Imperial units only (miles/mph/ft), no metric toggle.
+- GPX export includes heart rate and cadence but not power (no standard GPX field for it);
+  a TCX export would let power ride along too.
+- Discussed but not built: auto-pause when stopped, an elevation-profile strip on the ride
+  screen, structured/ERG-mode workouts (trainer holds a target power through timed intervals,
+  as opposed to the route-grade simulation that's already in), personal records and a "ghost"
+  pacer against a previous ride of the same route.

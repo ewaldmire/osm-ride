@@ -124,16 +124,11 @@ private fun DeviceSection(
     onSimulate: (() -> Unit)? = null,
 ) {
     Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                if (connectedName != null) "$connectedName · ${state.name}" else state.name,
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
+        Text(title, style = MaterialTheme.typography.titleLarge)
+        Text(
+            if (connectedName != null) "$connectedName · ${state.name}" else state.name,
+            style = MaterialTheme.typography.labelMedium,
+        )
 
         when (state) {
             BleConnectionState.CONNECTED -> {
