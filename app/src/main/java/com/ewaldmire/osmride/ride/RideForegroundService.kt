@@ -62,6 +62,7 @@ class RideForegroundService : LifecycleService() {
             .onEach { stats ->
                 val manager = NotificationManagerCompat.from(this)
                 manager.notify(NOTIFICATION_ID, buildNotification(stats.distanceMeters, stats.elapsedSeconds))
+                stats.currentGradePercent?.let { app.trainerBleManager.setSimulatedGrade(it) }
                 if (stats.state == RideState.FINISHED) {
                     stopSelf()
                 }

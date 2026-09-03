@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ewaldmire.osmride.OsmRideApp
 import com.ewaldmire.osmride.ble.BleConnectionState
+import com.ewaldmire.osmride.ble.GradeControlState
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.ride.RideForegroundService
 import com.ewaldmire.osmride.ride.RideStats
@@ -37,6 +38,7 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
 
     val trainerConnectionState: StateFlow<BleConnectionState> = trainerManager.connectionState
     val heartRateConnectionState: StateFlow<BleConnectionState> = hrManager.connectionState
+    val gradeControlState: StateFlow<GradeControlState> = trainerManager.gradeControlState
 
     private var engine: RideEngine? = null
     private var loadedRouteId: String? = null

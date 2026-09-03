@@ -10,6 +10,8 @@ object BleConstants {
     // Fitness Machine Service (FTMS)
     val FTMS_SERVICE: UUID = sig(0x1826)
     val INDOOR_BIKE_DATA: UUID = sig(0x2AD2)
+    /** Write-with-response + indicate. Used to request control and send simulated grade. */
+    val FITNESS_MACHINE_CONTROL_POINT: UUID = sig(0x2AD9)
 
     // Cycling Speed and Cadence (CSC) — fallback for trainers without FTMS
     val CSC_SERVICE: UUID = sig(0x1816)

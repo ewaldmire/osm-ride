@@ -28,6 +28,8 @@ data class RideStats(
     val currentCadenceRpm: Double? = null,
     val currentPowerWatts: Int? = null,
     val currentHeartRateBpm: Int? = null,
+    /** Average grade, as a percent, over a short window around the current position. */
+    val currentGradePercent: Double? = null,
     val avgSpeedMps: Double = 0.0,
     val avgPowerWatts: Double? = null,
     val avgCadenceRpm: Double? = null,
@@ -196,12 +198,28 @@ class RideEngine(val route: Route) {
             currentCadenceRpm = latestCadence,
             currentPowerWatts = latestPower,
             currentHeartRateBpm = latestHeartRate,
+            currentGradePercent = gradeAt(clamped),
             avgSpeedMps = if (elapsedSecondsValue > 0) clamped / elapsedSecondsValue else 0.0,
             avgPowerWatts = if (powerSamples > 0) powerSum / powerSamples else null,
             avgCadenceRpm = if (cadenceSamples > 0) cadenceSum / cadenceSamples else null,
             avgHeartRateBpm = if (hrSamples > 0) hrSum / hrSamples else null,
         )
         if (finished) lastTickTimestamp = null
+    }
+
+    /** Average grade (%) over a short window centered on [distance], for the trainer's simulated
+     * resistance and the ride screen's grade readout. Null if the route has no elevation data. */
+    private fun gradeAt(distance: Double): Double? {
+        if (route.points.size < 2) return null
+        val windowMeters = 30.0
+        val total = route.totalDistanceMeters
+        val ahead = (distance + windowMeters).coerceAtMost(total)
+        val behind = (distance - windowMeters).coerceAtLeast(0.0)
+        val run = ahead - behind
+        if (run <= 0) return null
+        val aheadElevation = positionAt(ahead).elevationMeters ?: return null
+        val behindElevation = positionAt(behind).elevationMeters ?: return null
+        return (aheadElevation - behindElevation) / run * 100.0
     }
 
     /** Binary search + linear interpolation of lat/lon/elevation/bearing at [distance] along the route. */

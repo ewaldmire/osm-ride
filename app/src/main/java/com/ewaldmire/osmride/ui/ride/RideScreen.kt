@@ -3,6 +3,7 @@ package com.ewaldmire.osmride.ui.ride
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ble.BleConnectionState
+import com.ewaldmire.osmride.ble.GradeControlState
 import com.ewaldmire.osmride.ride.RideState
 import com.ewaldmire.osmride.util.Units
 
@@ -50,6 +52,7 @@ fun RideScreen(
     val route by viewModel.route.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val trainerConnected by viewModel.trainerConnectionState.collectAsState()
+    val gradeControlState by viewModel.gradeControlState.collectAsState()
 
     LaunchedEffect(stats.state) {
         if (stats.state == RideState.FINISHED) onFinished()
@@ -60,15 +63,19 @@ fun RideScreen(
     // them to whatever color the map happens to show through.
     val view = LocalView.current
     DisposableEffect(Unit) {
-        val controller = view.context.findActivity()?.window?.let {
-            WindowCompat.getInsetsController(it, view)
-        }
+        val window = view.context.findActivity()?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         val originalLightStatusBars = controller?.isAppearanceLightStatusBars
         controller?.isAppearanceLightStatusBars = false
+
+        // Rides commonly run 30-90+ minutes; nothing else keeps the screen from sleeping.
+        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         onDispose {
             if (originalLightStatusBars != null) {
                 controller?.isAppearanceLightStatusBars = originalLightStatusBars
             }
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
@@ -116,6 +123,7 @@ fun RideScreen(
                     StatChip("Distance", Units.formatMiles(stats.distanceMeters))
                     StatChip("Time", Units.formatDuration(stats.elapsedSeconds))
                     StatChip("Speed", Units.formatMph(stats.currentSpeedMps))
+                    StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -124,6 +132,14 @@ fun RideScreen(
                     StatChip("Cadence", Units.formatCadence(stats.currentCadenceRpm))
                     StatChip("Power", Units.formatWatts(stats.currentPowerWatts?.toDouble()))
                     StatChip("Heart Rate", Units.formatHeartRate(stats.currentHeartRateBpm))
+                }
+                gradeControlStatusText(gradeControlState)?.let { statusText ->
+                    Text(
+                        statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
                 if (trainerConnected != BleConnectionState.CONNECTED) {
                     Text(
@@ -180,6 +196,15 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/** Null when there's nothing worth telling the rider (not connected, or trainer doesn't
+ * support it at all) - only surface the states that need a heads-up. */
+private fun gradeControlStatusText(state: GradeControlState): String? = when (state) {
+    GradeControlState.REQUESTING -> "Auto-resistance: connecting…"
+    GradeControlState.ACTIVE -> "Auto-resistance: on"
+    GradeControlState.REJECTED -> "Auto-resistance: unavailable"
+    GradeControlState.UNAVAILABLE -> null
 }
 
 @Composable

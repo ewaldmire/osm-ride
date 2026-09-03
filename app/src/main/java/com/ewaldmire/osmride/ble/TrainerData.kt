@@ -26,3 +26,12 @@ data class ScannedDevice(
     val name: String,
     val address: String,
 )
+
+/** Whether the trainer is auto-adjusting resistance to match the route's simulated grade. */
+enum class GradeControlState {
+    /** No FTMS Control Point on this device (e.g. CSC-only trainers, or not connected). */
+    UNAVAILABLE,
+    REQUESTING,
+    ACTIVE,
+    REJECTED,
+}

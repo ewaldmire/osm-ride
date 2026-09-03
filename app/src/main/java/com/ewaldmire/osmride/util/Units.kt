@@ -19,6 +19,8 @@ object Units {
     fun formatCadence(rpm: Double?): String = if (rpm == null) "--" else String.format(Locale.US, "%.0f rpm", rpm)
     fun formatHeartRate(bpm: Double?): String = if (bpm == null) "--" else String.format(Locale.US, "%.0f bpm", bpm)
     fun formatHeartRate(bpm: Int?): String = if (bpm == null) "--" else "$bpm bpm"
+    fun formatGrade(percent: Double?): String =
+        if (percent == null) "--" else String.format(Locale.US, "%+.1f%%", percent)
 
     fun formatDuration(totalSeconds: Long): String {
         val h = totalSeconds / 3600

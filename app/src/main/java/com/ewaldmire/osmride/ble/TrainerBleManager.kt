@@ -32,6 +32,12 @@ import kotlinx.coroutines.launch
 
 private enum class TrainerProtocol { FTMS, CSC }
 
+// FTMS Control Point op codes we use (Bluetooth SIG Fitness Machine Service spec).
+private const val OP_REQUEST_CONTROL: Byte = 0x00
+private const val OP_SET_INDOOR_BIKE_SIMULATION_PARAMETERS: Byte = 0x11
+private const val OP_RESPONSE_CODE: Byte = 0x80.toByte()
+private const val RESULT_SUCCESS: Byte = 0x01
+
 /**
  * Connects to a BLE smart trainer and streams parsed speed/cadence/power/distance samples.
  *
@@ -55,8 +61,14 @@ class TrainerBleManager(context: Context) {
     private val _samples = MutableSharedFlow<TrainerSample>(extraBufferCapacity = 64)
     val samples: SharedFlow<TrainerSample> = _samples.asSharedFlow()
 
+    /** Whether the trainer is currently auto-adjusting resistance to match simulated grade. */
+    private val _gradeControlState = MutableStateFlow(GradeControlState.UNAVAILABLE)
+    val gradeControlState: StateFlow<GradeControlState> = _gradeControlState.asStateFlow()
+
     private var gatt: BluetoothGatt? = null
     private var protocol: TrainerProtocol? = null
+    private var controlPointCharacteristic: BluetoothGattCharacteristic? = null
+    private var lastSentGradeTenths: Int? = null
 
     private val simulationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var simulationJob: Job? = null
@@ -67,6 +79,12 @@ class TrainerBleManager(context: Context) {
     private var previousCrankRevs: Int? = null
     private var previousCrankEventTime: Int? = null
     private var cscCumulativeDistanceMeters = 0.0
+
+    // A BLE connection only allows one outstanding GATT write/descriptor-write at a time;
+    // issuing concurrent ones silently drops one. Everything that writes to the peripheral
+    // (notify/indicate CCCDs, control point commands) goes through this serial queue instead.
+    private val pendingGattOperations = ArrayDeque<() -> Unit>()
+    private var gattOperationInFlight = false
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -107,11 +125,7 @@ class TrainerBleManager(context: Context) {
     fun connect(address: String) {
         stopScan()
         val device = adapter?.getRemoteDevice(address) ?: return
-        previousWheelRevs = null
-        previousWheelEventTime = null
-        previousCrankRevs = null
-        previousCrankEventTime = null
-        cscCumulativeDistanceMeters = 0.0
+        resetPerConnectionState()
         _connectionState.value = BleConnectionState.CONNECTING
         gatt = device.connectGatt(appContext, false, gattCallback)
     }
@@ -119,6 +133,7 @@ class TrainerBleManager(context: Context) {
     fun disconnect() {
         simulationJob?.cancel()
         simulationJob = null
+        resetPerConnectionState()
         gatt?.disconnect()
         gatt?.close()
         gatt = null
@@ -126,15 +141,60 @@ class TrainerBleManager(context: Context) {
         _connectionState.value = BleConnectionState.DISCONNECTED
     }
 
+    private fun resetPerConnectionState() {
+        previousWheelRevs = null
+        previousWheelEventTime = null
+        previousCrankRevs = null
+        previousCrankEventTime = null
+        cscCumulativeDistanceMeters = 0.0
+        pendingGattOperations.clear()
+        gattOperationInFlight = false
+        controlPointCharacteristic = null
+        lastSentGradeTenths = null
+        _gradeControlState.value = GradeControlState.UNAVAILABLE
+    }
+
+    /**
+     * Sends the route's current grade to the trainer so it can auto-adjust resistance to match
+     * (FTMS "Set Indoor Bike Simulation Parameters"). No-ops until control has been granted, and
+     * debounces so we're not writing on every ~1Hz stats update for an unchanged grade.
+     */
+    fun setSimulatedGrade(gradePercent: Double) {
+        val characteristic = controlPointCharacteristic ?: return
+        if (_gradeControlState.value != GradeControlState.ACTIVE) return
+
+        val roundedTenths = (gradePercent * 10).roundToInt()
+        if (roundedTenths == lastSentGradeTenths) return
+        lastSentGradeTenths = roundedTenths
+
+        // sint16, 0.01% resolution.
+        val gradeRaw = (gradePercent * 100).roundToInt().coerceIn(-32768, 32767)
+        // No wind simulation: sint16 wind speed left at 0.
+        // Crr (rolling resistance, uint8 @ 0.0001) and Cw (wind resistance, uint8 @ 0.01 kg/m)
+        // use the commonly-used road-bike defaults (0.0040, 0.51) most trainer-control apps use.
+        val payload = ByteArray(7)
+        payload[0] = OP_SET_INDOOR_BIKE_SIMULATION_PARAMETERS
+        payload[1] = 0
+        payload[2] = 0
+        payload[3] = (gradeRaw and 0xFF).toByte()
+        payload[4] = ((gradeRaw shr 8) and 0xFF).toByte()
+        payload[5] = 40 // Crr = 0.0040
+        payload[6] = 51 // Cw = 0.51
+
+        enqueueGattOperation { writeControlPoint(characteristic, payload) }
+    }
+
     /**
      * Testing helper: feeds synthetic speed/cadence/power samples on a 1Hz timer, with no real
      * BLE device involved, so the ride screen and avatar movement can be exercised without
      * trainer hardware. Distance is deliberately left null so the same speed-integration path
-     * used for real CSC-only trainers gets exercised too.
+     * used for real CSC-only trainers gets exercised too. Reports grade control as active (with
+     * no real trainer behind it) so that UI can be exercised too.
      */
     fun startSimulation() {
         disconnect()
         _connectionState.value = BleConnectionState.CONNECTED
+        _gradeControlState.value = GradeControlState.ACTIVE
         simulationJob = simulationScope.launch {
             var t = 0.0
             while (isActive) {
@@ -181,7 +241,19 @@ class TrainerBleManager(context: Context) {
                 return
             }
             protocol = if (ftmsChar != null) TrainerProtocol.FTMS else TrainerProtocol.CSC
-            enableNotifications(g, target)
+            enqueueGattOperation { enableNotifications(g, target) }
+
+            val controlChar = g.getService(BleConstants.FTMS_SERVICE)
+                ?.getCharacteristic(BleConstants.FITNESS_MACHINE_CONTROL_POINT)
+            controlPointCharacteristic = controlChar
+            if (controlChar != null) {
+                _gradeControlState.value = GradeControlState.REQUESTING
+                enqueueGattOperation { enableIndications(g, controlChar) }
+                enqueueGattOperation { writeControlPoint(controlChar, byteArrayOf(OP_REQUEST_CONTROL)) }
+            } else {
+                _gradeControlState.value = GradeControlState.UNAVAILABLE
+            }
+
             _connectionState.value = BleConnectionState.CONNECTED
         }
 
@@ -191,6 +263,10 @@ class TrainerBleManager(context: Context) {
         ) {
             @Suppress("DEPRECATION")
             val data = characteristic.value ?: return
+            if (characteristic.uuid == BleConstants.FITNESS_MACHINE_CONTROL_POINT) {
+                handleControlPointIndication(data)
+                return
+            }
             val sample = when (protocol) {
                 TrainerProtocol.FTMS -> parseIndoorBikeData(data)
                 TrainerProtocol.CSC -> parseCscMeasurement(data)
@@ -200,16 +276,97 @@ class TrainerBleManager(context: Context) {
                 _samples.tryEmit(sample)
             }
         }
+
+        override fun onDescriptorWrite(
+            g: BluetoothGatt,
+            descriptor: BluetoothGattDescriptor,
+            status: Int,
+        ) {
+            onGattOperationComplete()
+        }
+
+        override fun onCharacteristicWrite(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int,
+        ) {
+            onGattOperationComplete()
+        }
+    }
+
+    private fun enqueueGattOperation(operation: () -> Unit) {
+        pendingGattOperations.addLast(operation)
+        if (!gattOperationInFlight) runNextGattOperation()
+    }
+
+    private fun runNextGattOperation() {
+        val next = pendingGattOperations.removeFirstOrNull()
+        if (next == null) {
+            gattOperationInFlight = false
+            return
+        }
+        gattOperationInFlight = true
+        next()
+    }
+
+    private fun onGattOperationComplete() {
+        runNextGattOperation()
     }
 
     private fun enableNotifications(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
         g.setCharacteristicNotification(characteristic, true)
         val descriptor = characteristic.getDescriptor(BleConstants.CLIENT_CHARACTERISTIC_CONFIG)
-            ?: return
+        if (descriptor == null) {
+            onGattOperationComplete()
+            return
+        }
         @Suppress("DEPRECATION")
         descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
         @Suppress("DEPRECATION")
         g.writeDescriptor(descriptor)
+    }
+
+    private fun enableIndications(g: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+        g.setCharacteristicNotification(characteristic, true)
+        val descriptor = characteristic.getDescriptor(BleConstants.CLIENT_CHARACTERISTIC_CONFIG)
+        if (descriptor == null) {
+            onGattOperationComplete()
+            return
+        }
+        @Suppress("DEPRECATION")
+        descriptor.value = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+        @Suppress("DEPRECATION")
+        g.writeDescriptor(descriptor)
+    }
+
+    private fun writeControlPoint(characteristic: BluetoothGattCharacteristic, payload: ByteArray) {
+        val g = gatt
+        if (g == null) {
+            onGattOperationComplete()
+            return
+        }
+        @Suppress("DEPRECATION")
+        characteristic.value = payload
+        @Suppress("DEPRECATION")
+        val started = g.writeCharacteristic(characteristic)
+        if (!started) {
+            onGattOperationComplete()
+        }
+    }
+
+    /** Response Code indication: [0x80, echoed request op code, result code]. */
+    private fun handleControlPointIndication(data: ByteArray) {
+        if (data.size < 3 || data[0] != OP_RESPONSE_CODE) return
+        val requestOpCode = data[1]
+        val success = data[2] == RESULT_SUCCESS
+        when (requestOpCode) {
+            OP_REQUEST_CONTROL -> {
+                _gradeControlState.value = if (success) GradeControlState.ACTIVE else GradeControlState.REJECTED
+            }
+            OP_SET_INDOOR_BIKE_SIMULATION_PARAMETERS -> {
+                if (!success) _gradeControlState.value = GradeControlState.REJECTED
+            }
+        }
     }
 
     private fun parseIndoorBikeData(data: ByteArray): TrainerSample? {
