@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ewaldmire.osmride.ui.history.RideHistoryScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.ride.RideScreen
 import com.ewaldmire.osmride.ui.routes.RoutesListScreen
@@ -19,10 +20,14 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             RoutesListScreen(
                 onRouteSelected = { routeId -> navController.navigate(Destinations.ride(routeId)) },
                 onPairDevices = { navController.navigate(Destinations.PAIRING) },
+                onViewHistory = { navController.navigate(Destinations.HISTORY) },
             )
         }
         composable(Destinations.PAIRING) {
             DevicePairingScreen(onDone = { navController.popBackStack() })
+        }
+        composable(Destinations.HISTORY) {
+            RideHistoryScreen(onBack = { navController.popBackStack() })
         }
         composable(
             Destinations.RIDE,

@@ -13,6 +13,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -27,6 +29,7 @@ fun RideSummaryScreen(
 ) {
     val context = LocalContext.current
     val stats = viewModel.stats
+    val savedRecord by viewModel.savedRecord.collectAsState()
 
     Scaffold { padding ->
         Column(
@@ -49,8 +52,9 @@ fun RideSummaryScreen(
 
             if (viewModel.hasTrackPoints) {
                 Button(
+                    enabled = savedRecord != null,
                     onClick = {
-                        val file = viewModel.writeGpxFile() ?: return@Button
+                        val file = viewModel.gpxFileToShare() ?: return@Button
                         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "application/gpx+xml"
@@ -65,9 +69,14 @@ fun RideSummaryScreen(
                 }
             }
 
+            Text(
+                "Saved to ride history.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
             OutlinedButton(
                 onClick = {
-                    viewModel.discard()
+                    viewModel.clearActiveRideEngine()
                     onDone()
                 },
                 modifier = Modifier.fillMaxWidth(),

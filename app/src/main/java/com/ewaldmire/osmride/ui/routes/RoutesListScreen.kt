@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -47,6 +48,7 @@ import com.ewaldmire.osmride.util.Units
 fun RoutesListScreen(
     onRouteSelected: (String) -> Unit,
     onPairDevices: () -> Unit,
+    onViewHistory: () -> Unit,
     viewModel: RoutesListViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -72,6 +74,9 @@ fun RoutesListScreen(
             TopAppBar(
                 title = { Text("OSM Ride") },
                 actions = {
+                    IconButton(onClick = onViewHistory) {
+                        Icon(Icons.Filled.History, contentDescription = "Ride history")
+                    }
                     IconButton(onClick = onPairDevices) {
                         Icon(Icons.Filled.Bluetooth, contentDescription = "Pair devices")
                     }

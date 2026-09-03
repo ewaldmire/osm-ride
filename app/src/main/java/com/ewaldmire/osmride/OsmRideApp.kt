@@ -7,6 +7,7 @@ import com.ewaldmire.osmride.ble.HeartRateBleManager
 import com.ewaldmire.osmride.ble.TrainerBleManager
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.ride.RideForegroundService
+import com.ewaldmire.osmride.ride.RideHistoryRepository
 import com.ewaldmire.osmride.route.RouteRepository
 import org.maplibre.android.MapLibre
 
@@ -21,6 +22,7 @@ class OsmRideApp : Application() {
     val trainerBleManager: TrainerBleManager by lazy { TrainerBleManager(this) }
     val heartRateBleManager: HeartRateBleManager by lazy { HeartRateBleManager(this) }
     val routeRepository: RouteRepository by lazy { RouteRepository(this) }
+    val rideHistoryRepository: RideHistoryRepository by lazy { RideHistoryRepository(this) }
 
     var currentRideEngine: RideEngine? = null
 

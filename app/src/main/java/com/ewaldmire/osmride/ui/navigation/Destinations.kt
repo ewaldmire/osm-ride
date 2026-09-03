@@ -5,6 +5,7 @@ object Destinations {
     const val PAIRING = "pairing"
     const val RIDE = "ride/{routeId}"
     const val SUMMARY = "summary"
+    const val HISTORY = "history"
 
     fun ride(routeId: String) = "ride/$routeId"
 }
