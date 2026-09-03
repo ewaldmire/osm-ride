@@ -64,8 +64,15 @@ private val BUILDING_COLORS = intArrayOf(
 )
 
 /** Pitch (degrees from straight-down) for the following camera - gives a 3D "chase cam" view of
- * buildings along the route instead of a flat top-down map. */
-private const val RIDE_CAMERA_TILT_DEGREES = 55.0
+ * buildings along the route instead of a flat top-down map. MapLibre's default pitch ceiling is
+ * 60 (raised below via setMaxPitchPreference), so this and RIDE_CAMERA_MAX_PITCH_DEGREES sit
+ * close together - push both higher together if the SDK actually honors it on-device. */
+private const val RIDE_CAMERA_TILT_DEGREES = 65.0
+
+/** Ceiling for both the tilt button and the two-finger tilt gesture - MapLibre's own default is
+ * 60; this asks for more legroom toward a horizon-level view, but flat vector tiles (no terrain
+ * mesh, no sky) will look increasingly stretched/distorted well before reaching it. */
+private const val RIDE_CAMERA_MAX_PITCH_DEGREES = 80.0
 
 /** Fraction of the map's height reserved as top padding while following - this recentres the
  * camera's focal point toward the bottom of the screen, so the bike renders "in the foreground"
@@ -126,6 +133,7 @@ fun BikeMapView(
             // pinch zooms - on by default, made explicit here since the tilt button above is the
             // discoverable counterpart to the two-finger-drag tilt gesture.
             loadedMap.uiSettings.isTiltGesturesEnabled = true
+            loadedMap.setMaxPitchPreference(RIDE_CAMERA_MAX_PITCH_DEGREES)
             loadedMap.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
                     manualOverrideActive = true
