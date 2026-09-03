@@ -11,6 +11,7 @@ from gi.repository import Gtk  # noqa: E402
 
 from .history_view import HistoryView
 from .pairing_view import PairingView
+from .routes_view import RoutesView
 from .settings_view import SettingsView
 
 
@@ -32,6 +33,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.pairing_view = PairingView(self)
         self.stack.add_named(self.pairing_view, "pairing")
 
+        self.routes_view = RoutesView(self)
+        self.stack.add_named(self.routes_view, "routes")
+
         self.stack.set_visible_child_name("history")
         self.show_all()
 
@@ -43,6 +47,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def show_pairing(self) -> None:
         self.stack.set_visible_child_name("pairing")
+
+    def show_routes(self) -> None:
+        self.stack.set_visible_child_name("routes")
 
     def show_placeholder(self, name: str, title: str) -> None:
         """Temporary stand-in for screens not built yet (Routes/Workouts/Settings/Ride) - a

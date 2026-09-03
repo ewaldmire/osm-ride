@@ -43,8 +43,8 @@ class HistoryView(Gtk.Box):
         for label, handler in [
             ("Settings", window.show_settings),
             ("Workouts", lambda: window.show_placeholder("workouts", "Workout Library")),
-            ("Ride", lambda: window.show_placeholder("routes", "Routes")),
-            ("Routes", lambda: window.show_placeholder("routes", "Routes")),
+            ("Ride", window.show_routes),
+            ("Routes", window.show_routes),
         ]:
             button = Gtk.Button(label=label)
             button.connect("clicked", lambda _b, h=handler: h())
