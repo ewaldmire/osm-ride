@@ -1,0 +1,8 @@
+# PyGObject (GTK3 + WebKit2 bindings) is intentionally NOT listed here - it needs the system
+# GTK/WebKit2GTK dev libraries and is installed via the system package manager, not pip.
+# On RHEL/CentOS Stream 9:
+#   sudo dnf install python3-gobject gtk3-devel webkit2gtk3-devel
+bleak>=1.0
+
+# Dev/test only
+pytest>=8.0
