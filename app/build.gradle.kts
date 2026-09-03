@@ -22,10 +22,24 @@ android {
         versionName = appVersionName
     }
 
+    signingConfigs {
+        // Committed (not secret — standard debug credentials) so every CI run signs release
+        // builds with the same key. Without this, AGP's implicit "debug" signingConfig falls
+        // back to auto-generating ~/.android/debug.keystore, which on GitHub Actions' ephemeral
+        // runners means a fresh random key every run — Android then refuses to install a build
+        // as an "update" over one signed with a different key (Obtainium: failureConflict).
+        create("ciRelease") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("ciRelease")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
