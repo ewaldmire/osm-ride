@@ -10,6 +10,8 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk  # noqa: E402
 
 from .history_view import HistoryView
+from .pairing_view import PairingView
+from .settings_view import SettingsView
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -24,11 +26,23 @@ class MainWindow(Gtk.ApplicationWindow):
         self.history_view = HistoryView(self)
         self.stack.add_named(self.history_view, "history")
 
+        self.settings_view = SettingsView(self)
+        self.stack.add_named(self.settings_view, "settings")
+
+        self.pairing_view = PairingView(self)
+        self.stack.add_named(self.pairing_view, "pairing")
+
         self.stack.set_visible_child_name("history")
         self.show_all()
 
     def show_history(self) -> None:
         self.stack.set_visible_child_name("history")
+
+    def show_settings(self) -> None:
+        self.stack.set_visible_child_name("settings")
+
+    def show_pairing(self) -> None:
+        self.stack.set_visible_child_name("pairing")
 
     def show_placeholder(self, name: str, title: str) -> None:
         """Temporary stand-in for screens not built yet (Routes/Workouts/Settings/Ride) - a

@@ -11,6 +11,7 @@ the one thing in this module GTK-specific enough that it can't be unit-tested wi
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import threading
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -37,13 +38,20 @@ class AsyncBridge:
         on_done: Callable[[T], None] | None = None,
         on_error: Callable[[BaseException], None] | None = None,
         marshal: Callable[[Callable[[], None]], None] | None = None,
-    ) -> None:
+    ) -> concurrent.futures.Future:
         """Schedules coro on the background loop. on_done/on_error (if given) run via `marshal`
         (defaults to calling directly on the background thread - GTK callers should pass
-        GLib.idle_add so callbacks land on the main thread instead)."""
+        GLib.idle_add so callbacks land on the main thread instead).
+
+        Returns the underlying future so callers can cancel a still-running coroutine (e.g. "Stop
+        Scan") via future.cancel() - run_coroutine_threadsafe's future is specifically wired so
+        cancelling it propagates a real asyncio.CancelledError into the coroutine, not just a
+        local no-op, even if the coroutine is already mid-await."""
         dispatch = marshal or (lambda fn: fn())
 
-        def _on_future_done(future: asyncio.Future) -> None:
+        def _on_future_done(future: concurrent.futures.Future) -> None:
+            if future.cancelled():
+                return  # an intentional Stop Scan, not a failure - nothing to report
             try:
                 result = future.result()
             except Exception as e:  # noqa: BLE001 - deliberately broad, handed to on_error
@@ -55,6 +63,7 @@ class AsyncBridge:
 
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         future.add_done_callback(_on_future_done)
+        return future
 
     def stop(self) -> None:
         self._loop.call_soon_threadsafe(self._loop.stop)

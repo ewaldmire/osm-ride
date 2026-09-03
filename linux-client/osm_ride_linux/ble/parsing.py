@@ -27,6 +27,16 @@ def _u32le(data: bytes, offset: int) -> int:
     return data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24)
 
 
+def parse_heart_rate_measurement(data: bytes) -> int | None:
+    if len(data) == 0:
+        return None
+    flags = data[0]
+    is_uint16 = flags & 0x01 != 0
+    if is_uint16:
+        return _u16le(data, 1) if len(data) >= 3 else None
+    return data[1] if len(data) >= 2 else None
+
+
 def parse_indoor_bike_data(data: bytes) -> TrainerSample | None:
     if len(data) < 2:
         return None

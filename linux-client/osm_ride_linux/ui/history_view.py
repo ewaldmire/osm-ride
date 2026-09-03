@@ -40,14 +40,14 @@ class HistoryView(Gtk.Box):
 
         bottom_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         bottom_bar.set_homogeneous(True)
-        for label, target, screen_title in [
-            ("Settings", "settings", "Settings"),
-            ("Workouts", "workouts", "Workout Library"),
-            ("Ride", "routes", "Routes"),
-            ("Routes", "routes", "Routes"),
+        for label, handler in [
+            ("Settings", window.show_settings),
+            ("Workouts", lambda: window.show_placeholder("workouts", "Workout Library")),
+            ("Ride", lambda: window.show_placeholder("routes", "Routes")),
+            ("Routes", lambda: window.show_placeholder("routes", "Routes")),
         ]:
             button = Gtk.Button(label=label)
-            button.connect("clicked", self._on_nav_clicked, target, screen_title)
+            button.connect("clicked", lambda _b, h=handler: h())
             bottom_bar.pack_start(button, True, True, 0)
 
         self.pack_start(title_label, False, False, 0)
@@ -61,9 +61,6 @@ class HistoryView(Gtk.Box):
         # marshaling is needed for this callback, unlike the BLE layer's.
         self._repo.on_rides_changed = lambda _rides: self.refresh()
         self.refresh()
-
-    def _on_nav_clicked(self, _button: Gtk.Button, target: str, title: str) -> None:
-        self.window.show_placeholder(target, title)
 
     def refresh(self) -> None:
         for child in list(self._list_box.get_children()):
