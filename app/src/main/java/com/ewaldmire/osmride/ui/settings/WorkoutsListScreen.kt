@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.Workout
+import com.ewaldmire.osmride.ui.workout.WorkoutProfileChart
 import com.ewaldmire.osmride.util.Units
 import kotlin.math.roundToInt
 
@@ -136,27 +138,33 @@ fun WorkoutsListScreen(
 @Composable
 private fun WorkoutCard(workout: Workout, onRename: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(workout.name, style = MaterialTheme.typography.titleMedium)
-                val avgWatts = workout.averageWatts()
-                Text(
-                    Units.formatDuration(workout.totalDurationSeconds) +
-                        (avgWatts?.let { " · avg $it W" } ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Row {
-                IconButton(onClick = onRename) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Rename workout")
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(workout.name, style = MaterialTheme.typography.titleMedium)
+                    val avgWatts = workout.averageWatts()
+                    Text(
+                        Units.formatDuration(workout.totalDurationSeconds) +
+                            (avgWatts?.let { " · avg $it W" } ?: ""),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete workout")
+                Row {
+                    IconButton(onClick = onRename) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Rename workout")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete workout")
+                    }
                 }
             }
+            WorkoutProfileChart(
+                workout = workout,
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 8.dp),
+            )
         }
     }
 }

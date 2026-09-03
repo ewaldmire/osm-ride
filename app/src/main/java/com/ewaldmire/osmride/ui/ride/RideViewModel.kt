@@ -42,8 +42,8 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
     val gradeControlState: StateFlow<GradeControlState> = trainerManager.gradeControlState
 
     val availableWorkouts: StateFlow<List<Workout>> = app.workoutRepository.workouts
-    private val _selectedWorkoutName = MutableStateFlow<String?>(null)
-    val selectedWorkoutName: StateFlow<String?> = _selectedWorkoutName.asStateFlow()
+    private val _selectedWorkout = MutableStateFlow<Workout?>(null)
+    val selectedWorkout: StateFlow<Workout?> = _selectedWorkout.asStateFlow()
 
     private var engine: RideEngine? = null
     private var loadedRouteId: String? = null
@@ -70,7 +70,7 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
             engine = activeEngine
             _route.value = activeEngine.route
             _stats.value = activeEngine.stats.value
-            _selectedWorkoutName.value = activeEngine.workout?.name
+            _selectedWorkout.value = activeEngine.workout
             viewModelScope.launch { activeEngine.stats.collect { _stats.value = it } }
         }
     }
@@ -79,7 +79,7 @@ class RideViewModel(application: Application) : AndroidViewModel(application) {
     fun selectWorkout(workoutId: String?) {
         val workout = workoutId?.let { app.workoutRepository.getWorkout(it) }
         engine?.workout = workout
-        _selectedWorkoutName.value = workout?.name
+        _selectedWorkout.value = workout
     }
 
     fun start() {

@@ -53,6 +53,7 @@ import com.ewaldmire.osmride.ble.BleConnectionState
 import com.ewaldmire.osmride.ble.GradeControlState
 import com.ewaldmire.osmride.ride.RideState
 import com.ewaldmire.osmride.ride.Workout
+import com.ewaldmire.osmride.ui.workout.WorkoutProfileChart
 import com.ewaldmire.osmride.util.Units
 
 @Composable
@@ -68,7 +69,7 @@ fun RideScreen(
     val trainerConnected by viewModel.trainerConnectionState.collectAsState()
     val gradeControlState by viewModel.gradeControlState.collectAsState()
     val availableWorkouts by viewModel.availableWorkouts.collectAsState()
-    val selectedWorkoutName by viewModel.selectedWorkoutName.collectAsState()
+    val selectedWorkout by viewModel.selectedWorkout.collectAsState()
     var showWorkoutPicker by remember { mutableStateOf(false) }
 
     // Zoom/rotation-mode "stick" across rides via SharedPreferences, not just this composition.
@@ -182,6 +183,13 @@ fun RideScreen(
                     StatChip("Grade", Units.formatGrade(stats.currentGradePercent))
                     StatChip("ERG Target", Units.formatWatts(stats.currentTargetWatts?.toDouble()))
                 }
+                selectedWorkout?.let { workout ->
+                    WorkoutProfileChart(
+                        workout = workout,
+                        progressSeconds = stats.elapsedSeconds,
+                        modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 8.dp),
+                    )
+                }
                 controlStatusText(gradeControlState, stats.currentTargetWatts != null)?.let { statusText ->
                     Text(
                         statusText,
@@ -215,11 +223,11 @@ fun RideScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "Workout: ${selectedWorkoutName ?: "None"}",
+                        "Workout: ${selectedWorkout?.name ?: "None"}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     TextButton(onClick = { showWorkoutPicker = true }) {
-                        Text(if (selectedWorkoutName == null) "Choose" else "Change")
+                        Text(if (selectedWorkout == null) "Choose" else "Change")
                     }
                 }
             }
