@@ -14,10 +14,10 @@ from pathlib import Path
 import gi
 
 gi.require_version("Gtk", "3.0")
-gi.require_version("WebKit2", "4.0")
-from gi.repository import Gtk, WebKit2  # noqa: E402
+from gi.repository import Gtk  # noqa: E402
 
 from ..route.models import RouteWaypoint  # noqa: E402
+from ..util.webkit_compat import WebKit2  # noqa: E402
 
 _MAP_HTML_PATH = Path(__file__).parent / "map_assets" / "map.html"
 

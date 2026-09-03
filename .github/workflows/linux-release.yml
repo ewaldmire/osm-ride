@@ -1,0 +1,98 @@
+name: Build and Publish Linux Flatpak
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "linux-client/**"
+      - ".github/workflows/linux-release.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system GTK3/WebKit2GTK bindings
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 python3-venv
+
+      # Same venv --system-site-packages recipe documented in README.md's "Running it" section -
+      # PyGObject is a system package, not pip-installable, so the venv needs to see it while
+      # still keeping pip installs (bleak, pytest) out of the way.
+      - name: Create venv and install Python dependencies
+        working-directory: linux-client
+        run: |
+          python3 -m venv --system-site-packages .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run pytest suite
+        working-directory: linux-client
+        run: |
+          source .venv/bin/activate
+          python3 -m pytest tests/ -q
+
+  build-flatpak:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flatpak and flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Install GNOME runtime and SDK
+        run: sudo flatpak install -y --noninteractive flathub org.gnome.Platform//49 org.gnome.Sdk//49
+
+      - name: Build the Flatpak
+        working-directory: linux-client/flatpak
+        run: |
+          flatpak-builder --force-clean --repo=repo build-dir com.ewaldmire.OsmRideLinux.yml
+
+      - name: Update repo metadata and appstream
+        working-directory: linux-client/flatpak
+        run: |
+          flatpak build-update-repo repo
+
+      - name: Bundle a single-file .flatpak for direct download
+        working-directory: linux-client/flatpak
+        run: |
+          flatpak build-bundle repo osm-ride-linux.flatpak com.ewaldmire.OsmRideLinux master
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p site/flatpak-repo
+          cp -r linux-client/flatpak/repo/. site/flatpak-repo/
+          cp linux-client/flatpak/osm-ride-linux.flatpak site/
+          cp linux-client/flatpak/com.ewaldmire.OsmRideLinux.flatpakref site/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publish:
+    needs: build-flatpak
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

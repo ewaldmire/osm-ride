@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.ewaldmire.OsmRideLinux</id>
+  <name>OSM Ride</name>
+  <summary>Indoor trainer companion with live GPX route replay</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- No LICENSE file exists in the source repo yet, so this is left unset rather than
+       guessed - self-hosted (not a Flathub submission), so nothing enforces this field. -->
+  <project_license>LicenseRef-proprietary</project_license>
+  <developer id="com.ewaldmire">
+    <name>Eddie Waldmire</name>
+  </developer>
+  <description>
+    <p>
+      OSM Ride connects to a BLE smart trainer (FTMS or CSC) and replays a pre-loaded GPX route
+      on a 3D map as you pedal, tracking distance, power, cadence, and heart rate. Structured
+      .erg/.mrc/.zwo workouts drive ERG mode, and finished rides export as GPX for Strava.
+    </p>
+    <p>
+      This is the Linux desktop counterpart to the OSM Ride Android app, sharing the same BLE
+      protocol handling and file formats.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.ewaldmire.OsmRideLinux.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-09-03">
+      <description>
+        <p>Initial self-hosted release: BLE trainer/HR pairing, ride history, settings, route and
+        workout import, the route creator (tap-to-route via BRouter), and the workout creator.</p>
+      </description>
+    </release>
+  </releases>
+</component>

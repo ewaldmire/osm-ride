@@ -1,0 +1,6 @@
+#!/bin/sh
+# Installed by the Flatpak manifest to /app/bin/osm-ride-linux - the `command:` entry point.
+# The app's own package lives under /app/lib/osm-ride-linux (not /app/lib/python*/site-packages)
+# since it isn't pip-installed, just copied in, so it needs to be on PYTHONPATH explicitly.
+export PYTHONPATH="/app/lib/osm-ride-linux:$PYTHONPATH"
+exec python3 -m osm_ride_linux "$@"

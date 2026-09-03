@@ -1,0 +1,8 @@
+[Flatpak Ref]
+Title=OSM Ride
+Name=com.ewaldmire.OsmRideLinux
+Branch=master
+Url=https://ewaldmire.github.io/osm-ride/flatpak-repo
+SuggestRemoteName=osm-ride-linux
+IsRuntime=false
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo

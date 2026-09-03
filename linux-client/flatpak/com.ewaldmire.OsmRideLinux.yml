@@ -1,0 +1,53 @@
+app-id: com.ewaldmire.OsmRideLinux
+runtime: org.gnome.Platform
+runtime-version: "49"
+sdk: org.gnome.Sdk
+command: osm-ride-linux
+
+# Self-hosted repo (see README.md), not a Flathub submission - Flathub's offline/pinned-source
+# build policy doesn't apply here, so python-deps below installs straight from PyPI at build
+# time (prebuilt manylinux wheels, no compiler needed) instead of hand-pinning sdist hashes.
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --share=network
+  - --device=dri
+  # BLE via bleak/BlueZ talks to org.bluez over the system D-Bus - no raw device access needed.
+  - --system-talk-name=org.bluez
+  - --talk-name=org.bluez
+
+modules:
+  - name: python-deps
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - pip3 install --prefix=/app --no-cache-dir dbus-fast bleak
+    # PyGObject (the `gi` bindings) and GTK3/WebKit2GTK themselves come from the runtime, not
+    # pip - see requirements.txt's note on why that package can't be pip-installed at all.
+    sources: []
+
+  - name: osm-ride-linux
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 osm-ride-linux /app/bin/osm-ride-linux
+      - install -Dm644 com.ewaldmire.OsmRideLinux.desktop /app/share/applications/com.ewaldmire.OsmRideLinux.desktop
+      - install -Dm644 com.ewaldmire.OsmRideLinux.metainfo.xml /app/share/metainfo/com.ewaldmire.OsmRideLinux.metainfo.xml
+      - install -Dm644 com.ewaldmire.OsmRideLinux.svg /app/share/icons/hicolor/scalable/apps/com.ewaldmire.OsmRideLinux.svg
+      - mkdir -p /app/lib/osm-ride-linux
+      - cp -r osm_ride_linux /app/lib/osm-ride-linux/osm_ride_linux
+      - find /app/lib/osm-ride-linux -name '__pycache__' -exec rm -rf {} +
+    sources:
+      - type: file
+        path: osm-ride-linux
+      - type: file
+        path: com.ewaldmire.OsmRideLinux.desktop
+      - type: file
+        path: com.ewaldmire.OsmRideLinux.metainfo.xml
+      - type: file
+        path: icons/com.ewaldmire.OsmRideLinux.svg
+      - type: dir
+        path: ../osm_ride_linux
+        dest: osm_ride_linux

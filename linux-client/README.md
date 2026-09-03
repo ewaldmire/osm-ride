@@ -9,12 +9,16 @@ shared in spirit, if not in code).
 
 ## Stack
 
-- **GTK3** + **WebKit2GTK 4.0** for the UI and embedded map (MapLibre GL JS via a WebKit view).
-  GTK3, not GTK4: RHEL 9's only WebKitGTK package (`webkit2gtk3`) is the GTK3-era binding - there
-  is no GTK4-native WebKit package in RHEL 9's repos.
+- **GTK3** + **WebKit2GTK** for the UI and embedded map (MapLibre GL JS via a WebKit view). GTK3,
+  not GTK4: RHEL 9's only WebKitGTK package (`webkit2gtk3`) is the GTK3-era binding - there is no
+  GTK4-native WebKit package in RHEL 9's repos. WebKit2GTK itself comes in two GIR versions with
+  an identical GTK3 API surface - "4.0" (RHEL 9's system package, paired with libsoup2) and "4.1"
+  (what the Flatpak runtime ships, paired with libsoup3). `util/webkit_compat.py` tries 4.1 first
+  and falls back to 4.0 so the same source runs unmodified in both places - see that file's
+  docstring for how this was verified against the real Flatpak runtime, not just assumed.
 - **bleak** for BLE (talks to BlueZ under the hood on Linux).
 - **Flatpak** for packaging, self-hosted via a static repo on GitHub Pages - no Flathub
-  submission, no Snap.
+  submission, no Snap. See `flatpak/` for the manifest and "Installing via Flatpak" below.
 
 ## Domain logic
 
@@ -27,10 +31,12 @@ shared in spirit, if not in code).
 
 ## Status
 
-Scaffolding, not a complete app yet. Built and functional: the GTK3 app shell, the async↔GTK
-bridge that lets `bleak` coexist with GTK's own main loop, Ride History, Settings, and Device
-Pairing (including a "Simulate for testing" trainer, no hardware required). Workouts, Routes, and
-Ride - the map, ERG mode, the actual point of the app - are still placeholder screens.
+Full feature parity with the Android app's core screens: the GTK3 app shell, the async↔GTK
+bridge that lets `bleak` coexist with GTK's own main loop, Ride History, Settings, Device Pairing
+(including a "Simulate for testing" trainer, no hardware required), Routes (import + the Route
+Creator's tap-to-route-via-BRouter builder), Workouts (import + the block-based Workout
+Creator), and the Ride screen itself (3D MapLibre map, ERG mode, live stats). Packaged as a
+Flatpak; see "Installing via Flatpak" below.
 
 ## Running it
 
@@ -48,11 +54,33 @@ pip install -r requirements.txt
 python3 -m osm_ride_linux
 ```
 
+## Installing via Flatpak
+
+Self-hosted, not on Flathub - the repo is a static file tree published via GitHub Pages by
+`.github/workflows/linux-release.yml` on every push to `main` that touches `linux-client/`. It's
+unsigned (no GPG key), so add it with `--no-gpg-verify` rather than double-clicking the
+`.flatpakref`:
+
+```
+flatpak remote-add --if-not-exists --no-gpg-verify osm-ride-linux \
+    https://ewaldmire.github.io/osm-ride/flatpak-repo
+flatpak install osm-ride-linux com.ewaldmire.OsmRideLinux
+flatpak run com.ewaldmire.OsmRideLinux
+```
+
+A single-file `osm-ride-linux.flatpak` bundle (for `flatpak install --bundle`, no remote needed)
+is also published alongside the repo.
+
 ## Development environment
 
 RHEL 9's WebKit2GTK/GTK3/flatpak-builder toolchain was verified in a `quay.io/centos/centos:stream9`
 podman container (CentOS Stream 9 tracks RHEL 9's package set closely) rather than assumed - see
-git history for what was actually tested there before landing.
+git history for what was actually tested there before landing. The Flatpak manifest itself
+(`flatpak/com.ewaldmire.OsmRideLinux.yml`) was built end-to-end with `flatpak-builder` against
+the real `org.gnome.Platform`/`org.gnome.Sdk` runtimes before being wired into CI - nested Flatpak
+sandboxing needs privileges a default podman container doesn't have (`bwrap` needs
+`--cap-add=SYS_ADMIN --cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/fuse` at minimum), so
+that verification ran in a separate throwaway privileged container, not the main dev one.
 
 ```
 sudo dnf install python3-gobject gtk3-devel webkit2gtk3-devel flatpak flatpak-builder
