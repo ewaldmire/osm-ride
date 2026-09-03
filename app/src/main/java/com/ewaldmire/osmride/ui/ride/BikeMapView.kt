@@ -13,6 +13,7 @@ import android.content.Context
 import com.ewaldmire.osmride.R
 import com.ewaldmire.osmride.ride.RidePosition
 import com.ewaldmire.osmride.route.Route
+import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
@@ -20,6 +21,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -32,6 +34,9 @@ private const val ROUTE_LAYER_ID = "route-layer"
 private const val BIKE_SOURCE_ID = "bike-source"
 private const val BIKE_LAYER_ID = "bike-layer"
 private const val BIKE_ICON_ID = "bike-icon"
+
+/** Close enough to see buildings/streets pass by, while staying within OSM raster tile coverage. */
+private const val RIDE_ZOOM = 18.0
 
 /** Plain raster style using standard OpenStreetMap tiles — no vector style/API key needed. */
 private const val OSM_RASTER_STYLE_JSON = """
@@ -93,7 +98,15 @@ fun BikeMapView(route: Route, position: RidePosition?, followBike: Boolean, modi
                 val style = map.style ?: return@getMapAsync
                 updateBikePosition(style, position)
                 if (followBike) {
-                    map.easeCamera(CameraUpdateFactory.newLatLng(LatLng(position.lat, position.lon)), 500)
+                    // Heading-up: rotate the camera to match travel direction (paired with
+                    // iconRotationAlignment(MAP) below, the bike icon then renders pointing
+                    // straight up on screen, matching the rotated map underneath it).
+                    val cameraPosition = CameraPosition.Builder()
+                        .target(LatLng(position.lat, position.lon))
+                        .zoom(RIDE_ZOOM)
+                        .bearing(position.bearingDegrees)
+                        .build()
+                    map.easeCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 900)
                 }
             }
         }
@@ -126,6 +139,7 @@ private fun setUpRouteAndMarker(context: Context, style: Style, route: Route) {
             PropertyFactory.iconImage(BIKE_ICON_ID),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
             PropertyFactory.iconRotate(0f),
         ),
     )

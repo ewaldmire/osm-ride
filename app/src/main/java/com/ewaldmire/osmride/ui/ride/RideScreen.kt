@@ -1,11 +1,16 @@
 package com.ewaldmire.osmride.ui.ride
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -18,12 +23,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ble.BleConnectionState
 import com.ewaldmire.osmride.ride.RideState
@@ -45,6 +55,23 @@ fun RideScreen(
         if (stats.state == RideState.FINISHED) onFinished()
     }
 
+    // The map is edge-to-edge and its tile colors are unpredictable, so force light (white)
+    // status bar icons for this screen and back them with a scrim below, rather than leaving
+    // them to whatever color the map happens to show through.
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val controller = view.context.findActivity()?.window?.let {
+            WindowCompat.getInsetsController(it, view)
+        }
+        val originalLightStatusBars = controller?.isAppearanceLightStatusBars
+        controller?.isAppearanceLightStatusBars = false
+        onDispose {
+            if (originalLightStatusBars != null) {
+                controller?.isAppearanceLightStatusBars = originalLightStatusBars
+            }
+        }
+    }
+
     val currentRoute = route
     Box(modifier = Modifier.fillMaxSize()) {
         if (currentRoute != null) {
@@ -55,6 +82,17 @@ fun RideScreen(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent),
+                    ),
+                ),
+        )
 
         Surface(
             modifier = Modifier
@@ -136,6 +174,12 @@ fun RideScreen(
             }
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable
