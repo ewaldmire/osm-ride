@@ -31,6 +31,7 @@ class RideHistoryRepository(context: Context) {
             val record = RideRecord(
                 id = id,
                 routeName = routeName,
+                title = routeName,
                 completedAtEpochMillis = System.currentTimeMillis(),
                 distanceMeters = stats.distanceMeters,
                 durationSeconds = stats.elapsedSeconds,
@@ -38,6 +39,7 @@ class RideHistoryRepository(context: Context) {
                 avgPowerWatts = stats.avgPowerWatts,
                 avgCadenceRpm = stats.avgCadenceRpm,
                 avgHeartRateBpm = stats.avgHeartRateBpm,
+                estimatedKilocalories = stats.estimatedKilocalories,
                 gpxFileName = fileName,
             )
             val updated = listOf(record) + _rides.value
@@ -45,6 +47,14 @@ class RideHistoryRepository(context: Context) {
             saveIndex(updated)
             record
         }
+
+    /** Lets the rider rename a ride and add notes after the fact - useful when they ride the
+     * same route regularly and want to tell repeat rides of it apart in history. */
+    suspend fun updateRide(id: String, title: String, notes: String) = withContext(Dispatchers.IO) {
+        val updated = _rides.value.map { if (it.id == id) it.copy(title = title, notes = notes) else it }
+        _rides.value = updated
+        saveIndex(updated)
+    }
 
     fun gpxFile(record: RideRecord): File = File(ridesDir, record.gpxFileName)
 

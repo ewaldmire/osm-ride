@@ -34,7 +34,13 @@ data class RideStats(
     val avgPowerWatts: Double? = null,
     val avgCadenceRpm: Double? = null,
     val avgHeartRateBpm: Double? = null,
-)
+) {
+    /** Rough estimate from mechanical work (avg power x duration) at ~24% gross cycling
+     * efficiency, which conveniently makes kcal ~= kJ of work. Null without power data to
+     * compute it from (e.g. a CSC-only trainer with no power meter). */
+    val estimatedKilocalories: Double?
+        get() = avgPowerWatts?.let { it * elapsedSeconds / 1000.0 }
+}
 
 data class RecordedTrackPoint(
     val timestampMillis: Long,

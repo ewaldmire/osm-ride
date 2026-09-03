@@ -40,6 +40,15 @@ class RideSummaryViewModel(application: Application) : AndroidViewModel(applicat
 
     fun gpxFileToShare(): File? = savedRecord.value?.let { historyRepository.gpxFile(it) }
 
+    fun saveTitleAndNotes(title: String, notes: String) {
+        val id = savedRecord.value?.id ?: return
+        val resolvedTitle = title.ifBlank { routeName }
+        viewModelScope.launch {
+            historyRepository.updateRide(id, resolvedTitle, notes)
+            _savedRecord.value = _savedRecord.value?.copy(title = resolvedTitle, notes = notes)
+        }
+    }
+
     fun clearActiveRideEngine() {
         app.currentRideEngine = null
     }

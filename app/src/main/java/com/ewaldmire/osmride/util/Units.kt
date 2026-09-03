@@ -21,6 +21,8 @@ object Units {
     fun formatHeartRate(bpm: Int?): String = if (bpm == null) "--" else "$bpm bpm"
     fun formatGrade(percent: Double?): String =
         if (percent == null) "--" else String.format(Locale.US, "%+.1f%%", percent)
+    fun formatKilocalories(kcal: Double?): String =
+        if (kcal == null) "--" else String.format(Locale.US, "%.0f Cal", kcal)
 
     fun formatDuration(totalSeconds: Long): String {
         val h = totalSeconds / 3600

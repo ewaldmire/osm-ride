@@ -6,15 +6,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -31,19 +37,45 @@ fun RideSummaryScreen(
     val stats = viewModel.stats
     val savedRecord by viewModel.savedRecord.collectAsState()
 
+    var title by remember { mutableStateOf(viewModel.routeName) }
+    var notes by remember { mutableStateOf("") }
+
     Scaffold { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Ride Complete", style = MaterialTheme.typography.headlineMedium)
-            Text(viewModel.routeName, style = MaterialTheme.typography.titleMedium)
+
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Ride name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Text(
+                "Route: ${viewModel.routeName}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Notes (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SummaryRow("Distance", Units.formatMiles(stats.distanceMeters))
                     SummaryRow("Time", Units.formatDuration(stats.elapsedSeconds))
                     SummaryRow("Avg Speed", Units.formatMph(stats.avgSpeedMps))
+                    SummaryRow("Calories", Units.formatKilocalories(stats.estimatedKilocalories))
                     SummaryRow("Avg Power", Units.formatWatts(stats.avgPowerWatts))
                     SummaryRow("Avg Cadence", Units.formatCadence(stats.avgCadenceRpm))
                     SummaryRow("Avg Heart Rate", Units.formatHeartRate(stats.avgHeartRateBpm))
@@ -76,6 +108,7 @@ fun RideSummaryScreen(
 
             OutlinedButton(
                 onClick = {
+                    viewModel.saveTitleAndNotes(title, notes)
                     viewModel.clearActiveRideEngine()
                     onDone()
                 },
