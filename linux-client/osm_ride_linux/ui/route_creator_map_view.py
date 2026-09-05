@@ -26,7 +26,7 @@ _MAP_HTML_PATH = Path(__file__).parent / "map_assets" / "map.html"
 
 class RouteCreatorMapView(Gtk.Box):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(hexpand=True, vexpand=True)
         self.on_map_tapped: Callable[[float, float], None] | None = None
 
         self._content_manager = WebKit.UserContentManager()
@@ -35,7 +35,10 @@ class RouteCreatorMapView(Gtk.Box):
         self._content_manager.register_script_message_handler("pageReady")
         self._content_manager.connect("script-message-received::pageReady", self._on_page_ready)
 
-        self.webview = WebKit.WebView(user_content_manager=self._content_manager)
+        # GTK4's Box.append() has no expand/fill arguments the way GTK3's pack_start() did -
+        # without explicitly setting these, the WebView reports its own small natural size and
+        # the map area collapses down to that instead of filling the space given to it.
+        self.webview = WebKit.WebView(user_content_manager=self._content_manager, hexpand=True, vexpand=True)
         self.append(self.webview)
 
         self._page_loaded = False

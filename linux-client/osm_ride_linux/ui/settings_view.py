@@ -1,5 +1,5 @@
 """Mirrors app/src/main/java/com/ewaldmire/osmride/ui/settings/SettingsScreen.kt: a Bluetooth
-Devices row (-> pairing), a Workout Library row, and the FTP field."""
+Devices row (-> pairing) and the FTP field. Workout Library isn't here - it's a bottom tab now."""
 
 from __future__ import annotations
 
@@ -31,15 +31,6 @@ class SettingsView(ToolbarPage):
         pairing_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
         pairing_row.connect("activated", lambda _r: window.show_pairing())
         devices_group.add(pairing_row)
-
-        workouts_row = Adw.ActionRow(
-            title="Workout Library",
-            subtitle="Import .erg, .mrc, or .zwo structured workouts for ERG mode",
-            activatable=True,
-        )
-        workouts_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
-        workouts_row.connect("activated", lambda _r: window.show_workouts())
-        devices_group.add(workouts_row)
         page.add(devices_group)
 
         training_group = Adw.PreferencesGroup(

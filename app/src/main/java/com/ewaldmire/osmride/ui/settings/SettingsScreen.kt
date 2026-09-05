@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,7 +33,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenPairing: () -> Unit, onOpenWorkouts: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpenPairing: () -> Unit) {
     val context = LocalContext.current
     var ftpText by remember { mutableStateOf(SettingsPrefs.getFtpWatts(context)?.toString() ?: "") }
 
@@ -59,12 +58,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpenPairing: () -> Unit, onOpenWorkouts
                 title = "Bluetooth Devices",
                 subtitle = "Pair your smart trainer and heart rate monitor",
                 onClick = onOpenPairing,
-            )
-            SettingsRow(
-                icon = Icons.Filled.FitnessCenter,
-                title = "Workout Library",
-                subtitle = "Import .erg, .mrc, or .zwo structured workouts for ERG mode",
-                onClick = onOpenWorkouts,
             )
 
             Text("Training", style = MaterialTheme.typography.titleMedium)

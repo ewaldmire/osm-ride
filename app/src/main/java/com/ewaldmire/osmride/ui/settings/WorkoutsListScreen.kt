@@ -93,7 +93,15 @@ fun WorkoutsListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Workout Library") },
+                title = {
+                    Column {
+                        Text("Workout Library")
+                        Text(
+                            "Import .erg, .mrc, or .zwo files for ERG mode",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -120,7 +128,7 @@ fun WorkoutsListScreen(
             ) {
                 Icon(Icons.Filled.FitnessCenter, contentDescription = null)
                 Text(
-                    "No workouts yet. Tap + to import an .erg, .mrc, or .zwo file.",
+                    "No workouts yet. Tap + to import a file, or build one from scratch.",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(top = 12.dp),
                 )

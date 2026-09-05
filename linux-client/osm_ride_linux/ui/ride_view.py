@@ -52,9 +52,33 @@ class RideView(Gtk.Overlay):
         self.map_view = RideMapView()
         self.set_child(self.map_view)
 
+        self._build_drag_bar()
         self._build_stats_panel()
         self._build_map_controls_panel()
         self._build_controls_panel()
+
+    def _build_drag_bar(self) -> None:
+        # The ride screen is the one place in the app with no Adw.HeaderBar (the map wants the
+        # full window while riding) - but once *any* screen uses one, GTK stops asking the
+        # window manager to draw its own title bar for this window at all, so without something
+        # here this screen would have no way to move the window and no window controls. A thin
+        # Gtk.WindowHandle strip along the top gives both back without needing a full header.
+        handle = Gtk.WindowHandle()
+        handle.set_valign(Gtk.Align.START)
+        handle.set_halign(Gtk.Align.FILL)
+
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        bar.set_size_request(-1, 36)
+        bar.add_css_class("osd")  # subtle translucent dark strip, standard style for map overlays
+        spacer = Gtk.Box(hexpand=True)
+        controls = Gtk.WindowControls(side=Gtk.PackType.END)
+        controls.set_valign(Gtk.Align.CENTER)
+        controls.set_margin_end(6)
+        bar.append(spacer)
+        bar.append(controls)
+        handle.set_child(bar)
+
+        self.add_overlay(handle)
 
     def _build_stats_panel(self) -> None:
         panel = Gtk.Frame()

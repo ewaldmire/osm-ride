@@ -86,7 +86,6 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenPairing = { navController.navigate(Destinations.PAIRING) },
-                    onOpenWorkouts = { navController.navigate(Destinations.WORKOUTS_LIST) },
                 )
             }
             composable(Destinations.WORKOUTS_LIST) {

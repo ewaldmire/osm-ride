@@ -39,7 +39,11 @@ class WorkoutsView(ToolbarPage):
         self.window = window
         self._repo = window.app.workout_repository
 
-        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Workouts"))
+        header = Adw.HeaderBar(
+            title_widget=Adw.WindowTitle(
+                title="Workouts", subtitle="Import .erg, .mrc, or .zwo files for ERG mode"
+            )
+        )
         create_button = Gtk.Button(label="Create Workout…")
         create_button.connect("clicked", lambda _b: window.show_workout_creator_new())
         import_button = Gtk.Button(label="Import…")
@@ -57,7 +61,7 @@ class WorkoutsView(ToolbarPage):
 
         self._empty_status = Adw.StatusPage(
             title="No workouts yet",
-            description="Import an .erg, .mrc, or .zwo file, or build one from scratch.",
+            description="Import a file above, or build one from scratch.",
             icon_name="system-run-symbolic",
         )
         self._workouts_group = Adw.PreferencesGroup()
