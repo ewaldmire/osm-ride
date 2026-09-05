@@ -10,8 +10,9 @@ import asyncio
 
 import gi
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 from ..route import brouter_client  # noqa: E402
 from ..route import gpx as gpx_module  # noqa: E402
@@ -19,11 +20,12 @@ from ..route.models import RouteWaypoint  # noqa: E402
 from ..route.repository import RouteRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
 from .route_creator_map_view import RouteCreatorMapView  # noqa: E402
+from .toolbar_page import ToolbarPage  # noqa: E402
 
 
-class RouteCreatorView(Gtk.Box):
+class RouteCreatorView(ToolbarPage):
     def __init__(self, window) -> None:  # noqa: ANN001 - MainWindow, avoiding an import cycle
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        super().__init__()
         self.window = window
         self.app = window.app
         self._repo = window.app.route_repository
@@ -34,28 +36,31 @@ class RouteCreatorView(Gtk.Box):
         self._preview_distance_meters: float | None = None
         self._preview_elevation_gain_meters: float | None = None
 
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        header.set_margin_top(8)
-        header.set_margin_bottom(4)
-        header.set_margin_start(12)
-        header.set_margin_end(12)
-        back = Gtk.Button(label="< Back")
+        header = Adw.HeaderBar()
+        back = Gtk.Button(icon_name="go-previous-symbolic")
         back.connect("clicked", lambda _b: self.window.show_routes())
+        header.pack_start(back)
+
         self._name_entry = Gtk.Entry()
         self._name_entry.set_hexpand(True)
-        undo_button = Gtk.Button(label="Undo")
-        undo_button.connect("clicked", lambda _b: self._undo())
-        clear_button = Gtk.Button(label="Clear")
-        clear_button.connect("clicked", lambda _b: self._clear())
+        header.set_title_widget(self._name_entry)
+
         self._save_button = Gtk.Button(label="Save")
+        self._save_button.add_css_class("suggested-action")
         self._save_button.connect("clicked", lambda _b: self._save())
-        header.pack_start(back, False, False, 0)
-        header.pack_start(self._name_entry, True, True, 0)
-        header.pack_start(undo_button, False, False, 0)
-        header.pack_start(clear_button, False, False, 0)
-        header.pack_start(self._save_button, False, False, 0)
+        clear_button = Gtk.Button(icon_name="edit-clear-symbolic", tooltip_text="Clear")
+        clear_button.connect("clicked", lambda _b: self._clear())
+        undo_button = Gtk.Button(icon_name="edit-undo-symbolic", tooltip_text="Undo")
+        undo_button.connect("clicked", lambda _b: self._undo())
+        header.pack_end(self._save_button)
+        header.pack_end(clear_button)
+        header.pack_end(undo_button)
+        self.add_top_bar(header)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
 
         hint = Gtk.Label(label="Tap the map to add waypoints - roads are routed automatically.")
+        hint.set_margin_top(4)
         hint.set_margin_start(12)
         hint.set_xalign(0.0)
 
@@ -67,11 +72,12 @@ class RouteCreatorView(Gtk.Box):
         self._summary_label.set_margin_top(4)
         self._summary_label.set_margin_bottom(8)
         self._summary_label.set_margin_start(12)
+        self._summary_label.set_xalign(0.0)
 
-        self.pack_start(header, False, False, 0)
-        self.pack_start(hint, False, False, 0)
-        self.pack_start(self.map_view, True, True, 0)
-        self.pack_start(self._summary_label, False, False, 0)
+        content.append(hint)
+        content.append(self.map_view)
+        content.append(self._summary_label)
+        self.set_content(content)
 
     def start_new(self) -> None:
         self._existing_id = None
@@ -172,12 +178,6 @@ class RouteCreatorView(Gtk.Box):
         self.window.show_routes()
 
     def _show_error(self, message: str) -> None:
-        dialog = Gtk.MessageDialog(
-            transient_for=self.window,
-            modal=True,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text=message,
-        )
-        dialog.run()
-        dialog.destroy()
+        dialog = Adw.AlertDialog.new("Error", message)
+        dialog.add_response("ok", "OK")
+        dialog.present(self.window)

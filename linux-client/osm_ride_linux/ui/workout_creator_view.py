@@ -10,17 +10,20 @@ one view - same approach as RouteCreatorView.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
 import gi
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk  # noqa: E402
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk  # noqa: E402
 
 from ..ride.models import Workout, WorkoutSegment  # noqa: E402
 from ..ride.workout_repository import WorkoutRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
+from .toolbar_page import ToolbarPage  # noqa: E402
 from .workout_profile_chart import WorkoutProfileChart  # noqa: E402
 
 
@@ -78,57 +81,70 @@ def _segment_to_draft(seg: WorkoutSegment) -> WorkoutBlockDraft:
     return WorkoutBlockDraft(duration_seconds=duration, type=BlockType.RAMP, start_watts=start, end_watts=end)
 
 
-class WorkoutCreatorView(Gtk.Box):
+class WorkoutCreatorView(ToolbarPage):
     def __init__(self, window) -> None:  # noqa: ANN001 - MainWindow, avoiding an import cycle
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        super().__init__()
         self.window = window
         self._repo = window.app.workout_repository
 
         self._existing_id: str | None = None
         self._blocks: list[WorkoutBlockDraft] = []
 
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        header.set_margin_top(8)
-        header.set_margin_bottom(4)
-        header.set_margin_start(12)
-        header.set_margin_end(12)
-        back = Gtk.Button(label="< Back")
+        header = Adw.HeaderBar()
+        back = Gtk.Button(icon_name="go-previous-symbolic")
         back.connect("clicked", lambda _b: self.window.show_workouts())
+        header.pack_start(back)
+
         self._name_entry = Gtk.Entry()
         self._name_entry.set_hexpand(True)
         self._name_entry.connect("changed", lambda _e: self._render())
-        add_button = Gtk.Button(label="+ Add Block")
-        add_button.connect("clicked", lambda _b: self._open_block_editor(None))
+        header.set_title_widget(self._name_entry)
+
         self._save_button = Gtk.Button(label="Save")
+        self._save_button.add_css_class("suggested-action")
         self._save_button.connect("clicked", lambda _b: self._save())
-        header.pack_start(back, False, False, 0)
-        header.pack_start(self._name_entry, True, True, 0)
-        header.pack_start(add_button, False, False, 0)
-        header.pack_start(self._save_button, False, False, 0)
+        add_button = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add Block")
+        add_button.connect("clicked", lambda _b: self._open_block_editor(None))
+        header.pack_end(self._save_button)
+        header.pack_end(add_button)
+        self.add_top_bar(header)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
 
         self._chart = WorkoutProfileChart()
+        self._chart.set_visible(False)
+        self._chart.set_margin_top(8)
         self._chart.set_margin_start(12)
         self._chart.set_margin_end(12)
         self._duration_label = Gtk.Label(xalign=0.0)
+        self._duration_label.set_visible(False)
         self._duration_label.set_margin_start(12)
         self._duration_label.set_margin_bottom(4)
 
-        self._empty_label = Gtk.Label(
-            label='No blocks yet. Tap "+ Add Block" to add a steady, ramp, or free-ride interval.'
+        self._empty_status = Adw.StatusPage(
+            title="No blocks yet",
+            description='Tap "+" to add a steady, ramp, or free-ride interval.',
+            icon_name="system-run-symbolic",
+            vexpand=True,
         )
-        self._empty_label.set_margin_top(24)
 
-        self._list_box = Gtk.ListBox()
-        self._list_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        scroller = Gtk.ScrolledWindow()
-        scroller.set_vexpand(True)
-        scroller.add(self._list_box)
+        self._blocks_group = Adw.PreferencesGroup()
+        self._block_rows: list[Adw.ActionRow] = []
+        blocks_scroller = Gtk.ScrolledWindow()
+        blocks_scroller.set_vexpand(True)
+        blocks_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        blocks_box.set_margin_top(8)
+        blocks_box.set_margin_bottom(16)
+        blocks_box.set_margin_start(16)
+        blocks_box.set_margin_end(16)
+        blocks_box.append(self._blocks_group)
+        blocks_scroller.set_child(blocks_box)
 
-        self.pack_start(header, False, False, 0)
-        self.pack_start(self._chart, False, False, 0)
-        self.pack_start(self._duration_label, False, False, 0)
-        self.pack_start(self._empty_label, False, False, 0)
-        self.pack_start(scroller, True, True, 0)
+        content.append(self._chart)
+        content.append(self._duration_label)
+        content.append(self._empty_status)
+        content.append(blocks_scroller)
+        self.set_content(content)
 
     def start_new(self) -> None:
         self._existing_id = None
@@ -146,13 +162,11 @@ class WorkoutCreatorView(Gtk.Box):
         self._render()
 
     def _render(self) -> None:
-        for child in list(self._list_box.get_children()):
-            self._list_box.remove(child)
-
         has_blocks = len(self._blocks) > 0
         self._chart.set_visible(has_blocks)
         self._duration_label.set_visible(has_blocks)
-        self._empty_label.set_visible(not has_blocks)
+        self._empty_status.set_visible(not has_blocks)
+        self._blocks_group.set_visible(has_blocks)
         self._save_button.set_sensitive(has_blocks)
 
         if has_blocks:
@@ -166,41 +180,35 @@ class WorkoutCreatorView(Gtk.Box):
             self._chart.set_workout(preview)
             self._duration_label.set_text(units.format_duration(preview.total_duration_seconds))
 
-        for index, block in enumerate(self._blocks):
-            self._list_box.add(self._build_row(index, block))
-        self._list_box.show_all()
+        for row in self._block_rows:
+            self._blocks_group.remove(row)
+        self._block_rows = [self._build_row(index, block) for index, block in enumerate(self._blocks)]
+        for row in self._block_rows:
+            self._blocks_group.add(row)
 
-    def _build_row(self, index: int, block: WorkoutBlockDraft) -> Gtk.ListBoxRow:
-        row = Gtk.ListBoxRow()
-        outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        outer.set_margin_top(6)
-        outer.set_margin_bottom(6)
-        outer.set_margin_start(12)
-        outer.set_margin_end(12)
+    def _build_row(self, index: int, block: WorkoutBlockDraft) -> Adw.ActionRow:
+        row = Adw.ActionRow(
+            title=f"{index + 1}. {_block_summary(block)}",
+            subtitle=units.format_duration(block.duration_seconds),
+        )
 
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        title_label = Gtk.Label(label=f"{index + 1}. {_block_summary(block)}", xalign=0.0)
-        duration_label = Gtk.Label(label=units.format_duration(block.duration_seconds), xalign=0.0)
-        info_box.pack_start(title_label, False, False, 0)
-        info_box.pack_start(duration_label, False, False, 0)
-        outer.pack_start(info_box, True, True, 0)
-
-        up_button = Gtk.Button(label="↑")
+        up_button = Gtk.Button(icon_name="go-up-symbolic", valign=Gtk.Align.CENTER)
+        up_button.add_css_class("flat")
         up_button.set_sensitive(index > 0)
         up_button.connect("clicked", lambda _b, i=index: self._move_block(i, -1))
-        down_button = Gtk.Button(label="↓")
+        down_button = Gtk.Button(icon_name="go-down-symbolic", valign=Gtk.Align.CENTER)
+        down_button.add_css_class("flat")
         down_button.set_sensitive(index < len(self._blocks) - 1)
         down_button.connect("clicked", lambda _b, i=index: self._move_block(i, 1))
-        edit_button = Gtk.Button(label="Edit")
+        edit_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
+        edit_button.add_css_class("flat")
         edit_button.connect("clicked", lambda _b, blk=block: self._open_block_editor(blk))
-        delete_button = Gtk.Button(label="Delete")
+        delete_button = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
+        delete_button.add_css_class("flat")
         delete_button.connect("clicked", lambda _b, blk=block: self._remove_block(blk.id))
 
-        outer.pack_start(up_button, False, False, 0)
-        outer.pack_start(down_button, False, False, 0)
-        outer.pack_start(edit_button, False, False, 0)
-        outer.pack_start(delete_button, False, False, 0)
-        row.add(outer)
+        for button in (up_button, down_button, edit_button, delete_button):
+            row.add_suffix(button)
         return row
 
     def _move_block(self, index: int, delta: int) -> None:
@@ -215,17 +223,17 @@ class WorkoutCreatorView(Gtk.Box):
         self._render()
 
     def _open_block_editor(self, initial: WorkoutBlockDraft | None) -> None:
-        dialog = BlockEditorDialog(self.window, initial)
-        response = dialog.run()
-        draft = dialog.build_draft() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-        if draft is None:
-            return
-        if initial is None:
-            self._blocks.append(draft)
-        else:
-            self._blocks = [draft if b.id == initial.id else b for b in self._blocks]
-        self._render()
+        def on_done(draft: WorkoutBlockDraft | None) -> None:
+            if draft is None:
+                return
+            if initial is None:
+                self._blocks.append(draft)
+            else:
+                self._blocks = [draft if b.id == initial.id else b for b in self._blocks]
+            self._render()
+
+        dialog = BlockEditorDialog(initial, on_done)
+        dialog.present(self.window)
 
     def _save(self) -> None:
         if not self._blocks:
@@ -240,42 +248,42 @@ class WorkoutCreatorView(Gtk.Box):
         self.window.show_workouts()
 
     def _show_error(self, message: str) -> None:
-        dialog = Gtk.MessageDialog(
-            transient_for=self.window,
-            modal=True,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text=message,
-        )
-        dialog.run()
-        dialog.destroy()
+        dialog = Adw.AlertDialog.new("Error", message)
+        dialog.add_response("ok", "OK")
+        dialog.present(self.window)
 
 
-class BlockEditorDialog(Gtk.Dialog):
-    def __init__(self, parent: Gtk.Window, initial: WorkoutBlockDraft | None) -> None:
-        super().__init__(title="Edit Block" if initial else "Add Block", transient_for=parent, modal=True)
-        self.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Save", Gtk.ResponseType.OK)
-        self.set_default_response(Gtk.ResponseType.OK)
-
+class BlockEditorDialog(Adw.Dialog):
+    def __init__(self, initial: WorkoutBlockDraft | None, on_done: Callable[[WorkoutBlockDraft | None], None]) -> None:
+        super().__init__(title="Edit Block" if initial else "Add Block", content_width=420, content_height=460)
+        self._on_done = on_done
         self._id = initial.id if initial else str(uuid.uuid4())
         self._type = initial.type if initial else BlockType.STEADY
 
-        content = self.get_content_area()
-        content.set_spacing(12)
-        content.set_margin_top(12)
-        content.set_margin_bottom(12)
-        content.set_margin_start(12)
-        content.set_margin_end(12)
+        toolbar_view = Adw.ToolbarView()
+        header = Adw.HeaderBar(show_title=True)
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", lambda _b: self._finish(None))
+        save_button = Gtk.Button(label="Save")
+        save_button.add_css_class("suggested-action")
+        save_button.connect("clicked", lambda _b: self._finish(self.build_draft()))
+        header.pack_start(cancel_button)
+        header.pack_end(save_button)
+        toolbar_view.add_top_bar(header)
 
-        type_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        type_box.get_style_context().add_class("linked")
-        steady_button = Gtk.RadioButton.new_with_label(None, "Steady")
-        ramp_button = Gtk.RadioButton.new_with_label_from_widget(steady_button, "Ramp")
-        free_button = Gtk.RadioButton.new_with_label_from_widget(steady_button, "Free Ride")
-        for button in (steady_button, ramp_button, free_button):
-            button.set_mode(False)  # renders as a toggle button, not a radio dot - a segmented
-            # control alongside the "linked" style class on the container, matching the
-            # FilterChip row in WorkoutCreatorScreen.kt's BlockEditorDialog.
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        content.set_margin_top(16)
+        content.set_margin_bottom(16)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+
+        type_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0, homogeneous=True)
+        type_box.add_css_class("linked")
+        steady_button = Gtk.ToggleButton(label="Steady")
+        ramp_button = Gtk.ToggleButton(label="Ramp")
+        ramp_button.set_group(steady_button)
+        free_button = Gtk.ToggleButton(label="Free Ride")
+        free_button.set_group(steady_button)
         self._type_buttons = {
             BlockType.STEADY: steady_button,
             BlockType.RAMP: ramp_button,
@@ -288,42 +296,46 @@ class BlockEditorDialog(Gtk.Dialog):
             (free_button, BlockType.FREE_RIDE),
         ):
             button.connect("toggled", self._on_type_toggled, block_type)
-            type_box.pack_start(button, True, True, 0)
+            type_box.append(button)
 
-        duration_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        duration_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, homogeneous=True)
         minutes = (initial.duration_seconds if initial else 300) // 60
         seconds = (initial.duration_seconds if initial else 300) % 60
         self._minutes_entry = self._numeric_entry(str(minutes))
         self._seconds_entry = self._numeric_entry(str(seconds))
-        duration_box.pack_start(self._labeled(self._minutes_entry, "Minutes"), True, True, 0)
-        duration_box.pack_start(self._labeled(self._seconds_entry, "Seconds"), True, True, 0)
+        duration_box.append(self._labeled(self._minutes_entry, "Minutes"))
+        duration_box.append(self._labeled(self._seconds_entry, "Seconds"))
 
         self._watts_entry = self._numeric_entry(str(initial.watts if initial else 150))
         self._start_watts_entry = self._numeric_entry(str(initial.start_watts if initial else 150))
         self._end_watts_entry = self._numeric_entry(str(initial.end_watts if initial else 250))
 
         self._steady_row = self._labeled(self._watts_entry, "Power (W)")
-        self._ramp_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self._ramp_row.pack_start(self._labeled(self._start_watts_entry, "Start (W)"), True, True, 0)
-        self._ramp_row.pack_start(self._labeled(self._end_watts_entry, "End (W)"), True, True, 0)
+        self._ramp_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, homogeneous=True)
+        self._ramp_row.append(self._labeled(self._start_watts_entry, "Start (W)"))
+        self._ramp_row.append(self._labeled(self._end_watts_entry, "End (W)"))
         self._free_ride_label = Gtk.Label(
-            label="No target power is sent to the trainer during this block.", xalign=0.0
+            label="No target power is sent to the trainer during this block.", xalign=0.0, wrap=True
         )
-        self._free_ride_label.set_line_wrap(True)
 
-        content.pack_start(type_box, False, False, 0)
-        content.pack_start(duration_box, False, False, 0)
-        content.pack_start(self._steady_row, False, False, 0)
-        content.pack_start(self._ramp_row, False, False, 0)
-        content.pack_start(self._free_ride_label, False, False, 0)
+        content.append(type_box)
+        content.append(duration_box)
+        content.append(self._steady_row)
+        content.append(self._ramp_row)
+        content.append(self._free_ride_label)
 
-        self.show_all()
+        toolbar_view.set_content(content)
+        self.set_child(toolbar_view)
         self._update_power_fields_visibility()
+
+    def _finish(self, draft: WorkoutBlockDraft | None) -> None:
+        self._on_done(draft)
+        self.close()
 
     def _labeled(self, entry: Gtk.Entry, label_text: str) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        box.pack_start(Gtk.Label(label=label_text, xalign=0.0), False, False, 0)
-        box.pack_start(entry, False, False, 0)
+        box.append(Gtk.Label(label=label_text, xalign=0.0))
+        box.append(entry)
         return box
 
     def _numeric_entry(self, initial_text: str) -> Gtk.Entry:
@@ -338,7 +350,7 @@ class BlockEditorDialog(Gtk.Dialog):
         if digits != entry.get_text():
             entry.set_text(digits)  # re-triggers "changed"; the recursive call settles it
 
-    def _on_type_toggled(self, button: Gtk.RadioButton, block_type: BlockType) -> None:
+    def _on_type_toggled(self, button: Gtk.ToggleButton, block_type: BlockType) -> None:
         if not button.get_active():
             return
         self._type = block_type

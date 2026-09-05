@@ -25,8 +25,8 @@ modules:
         - --share=network
     build-commands:
       - pip3 install --prefix=/app --no-cache-dir dbus-fast bleak
-    # PyGObject (the `gi` bindings) and GTK3/WebKit2GTK themselves come from the runtime, not
-    # pip - see requirements.txt's note on why that package can't be pip-installed at all.
+    # PyGObject (the `gi` bindings) and GTK4/libadwaita/WebKit themselves come from the runtime,
+    # not pip - see requirements.txt's note on why that package can't be pip-installed at all.
     sources: []
 
   - name: osm-ride-linux

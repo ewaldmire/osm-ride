@@ -1,12 +1,13 @@
-"""GTK3 application entry point - owns the repositories and BLE client as app-wide singletons,
-mirroring the role OsmRideApp.kt plays for the Android app."""
+"""GTK4/libadwaita application entry point - owns the repositories and BLE client as app-wide
+singletons, mirroring the role OsmRideApp.kt plays for the Android app."""
 
 from __future__ import annotations
 
 import gi
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk  # noqa: E402
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw  # noqa: E402
 
 from ..ble.heart_rate_client import HeartRateClient
 from ..ble.trainer_client import TrainerClient
@@ -18,7 +19,7 @@ from ..util.async_bridge import AsyncBridge
 from .main_window import MainWindow
 
 
-class OsmRideApplication(Gtk.Application):
+class OsmRideApplication(Adw.Application):
     def __init__(self) -> None:
         super().__init__(application_id="com.ewaldmire.OsmRideLinux")
         self.async_bridge = AsyncBridge()
@@ -37,7 +38,7 @@ class OsmRideApplication(Gtk.Application):
 
     def do_shutdown(self) -> None:
         self.async_bridge.stop()
-        Gtk.Application.do_shutdown(self)
+        Adw.Application.do_shutdown(self)
 
 
 def main() -> int:

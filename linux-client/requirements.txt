@@ -1,7 +1,9 @@
-# PyGObject (GTK3 + WebKit2 bindings) is intentionally NOT listed here - it needs the system
-# GTK/WebKit2GTK dev libraries and is installed via the system package manager, not pip.
-# On RHEL/CentOS Stream 9:
-#   sudo dnf install python3-gobject gtk3-devel webkit2gtk3-devel
+# PyGObject (GTK4 + libadwaita + WebKit bindings) is intentionally NOT listed here - see
+# README.md's "Development environment" section for why this app is developed and run against
+# the org.gnome.Platform Flatpak/GNOME runtime rather than system packages: neither RHEL 9 nor
+# RHEL 10 ship a WebKit built for GTK4, and RHEL 10 dropped WebKitGTK from its repos entirely
+# (confirmed directly against the distro repos, not assumed), so there is no viable native
+# dnf-installed dev path for this app's map screens on this distro family.
 bleak>=1.0
 
 # Dev/test only

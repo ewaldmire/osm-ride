@@ -34,7 +34,22 @@
   });
   map.setMaxPitch(MAX_PITCH_DEGREES);
 
+  // setRoute/updateBikePosition/etc below all touch sources that only exist once MapLibre's own
+  // asynchronous style load finishes (map.on('load') - a network fetch, separate from and later
+  // than the WebView's page-load event that the Python side gates on). Calls made from Python
+  // between page-load and map-load would otherwise throw on a missing source and silently drop
+  // the route, so every such function is queued here until mapReady flips true.
   window.mapReady = false;
+  const _pendingMapCalls = [];
+  function _whenMapReady(fn) {
+    return function (...args) {
+      if (window.mapReady) {
+        fn(...args);
+      } else {
+        _pendingMapCalls.push(() => fn(...args));
+      }
+    };
+  }
 
   // Set when a real touch/mouse gesture (not a programmatic easeTo/flyTo call) moves the camera -
   // e.originalEvent is only present for user-driven interaction. While true, followBike()
@@ -96,10 +111,12 @@
     }
 
     window.mapReady = true;
+    const pending = _pendingMapCalls.splice(0, _pendingMapCalls.length);
+    for (const call of pending) call();
   });
 
   // Called from Python with an already-JSON-encoded GeoJSON LineString Feature.
-  window.setRoute = function (geojson) {
+  window.setRoute = _whenMapReady(function (geojson) {
     map.getSource('route').setData(geojson);
     const coords = geojson.geometry.coordinates;
     if (coords.length < 2) return;
@@ -109,17 +126,17 @@
     );
     map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     map.fitBounds(bounds, { padding: 60, duration: 0 });
-  };
+  });
 
-  window.updateBikePosition = function (lon, lat) {
+  window.updateBikePosition = _whenMapReady(function (lon, lat) {
     map.getSource('bike').setData({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [lon, lat] },
       properties: {},
     });
-  };
+  });
 
-  window.followBike = function (lon, lat, zoom, bearing, tiltDegrees) {
+  window.followBike = _whenMapReady(function (lon, lat, zoom, bearing, tiltDegrees) {
     if (manualOverrideActive) {
       map.easeTo({ center: [lon, lat], duration: 900 });
       return;
@@ -128,7 +145,7 @@
     const containerHeight = map.getContainer().clientHeight;
     map.setPadding({ top: containerHeight * TOP_PADDING_FRACTION * tiltFraction, bottom: 0, left: 0, right: 0 });
     map.easeTo({ center: [lon, lat], zoom: zoom, bearing: bearing, pitch: tiltDegrees, duration: 900 });
-  };
+  });
 
   window.resetManualOverride = function () {
     manualOverrideActive = false;
@@ -148,15 +165,26 @@
     );
   });
 
-  window.setWaypoints = function (geojson) {
+  window.setWaypoints = _whenMapReady(function (geojson) {
     map.getSource('waypoints').setData(geojson);
-  };
+  });
 
   // Same shape as setRoute, but without recentring on every call - the rider is actively
   // tapping the map and a fitBounds jump after each tap would fight their own panning/zooming.
-  window.setPreviewRoute = function (geojson) {
+  window.setPreviewRoute = _whenMapReady(function (geojson) {
     map.getSource('route').setData(geojson);
-  };
+  });
+
+  // Tells Python this script has finished running and every window.* function above is safe to
+  // call - a push notification rather than something Python polls for. Needed because WebKit's
+  // own "load-changed" FINISHED signal does not reliably mean this script has finished executing
+  // by the time the signal is delivered (observed directly: evaluate_javascript() called from a
+  // FINISHED handler can still race ahead of this script, even after several-second waits), so
+  // polling from the Python side for a marker like this via evaluate_javascript is not
+  // trustworthy - only the page's own script knows for certain when it's done.
+  if (window.webkit && window.webkit.messageHandlers.pageReady) {
+    window.webkit.messageHandlers.pageReady.postMessage('ready');
+  }
 </script>
 </body>
 </html>

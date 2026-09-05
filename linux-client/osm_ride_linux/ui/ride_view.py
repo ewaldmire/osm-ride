@@ -4,17 +4,21 @@ tick into a RideEngine and feeding grade/ERG target back to the trainer.
 Mirrors app/src/main/java/com/ewaldmire/osmride/ride/RideForegroundService.kt's drive loop and
 ui/ride/RideScreen.kt's layout - but simpler, on purpose: RideForegroundService only exists
 because Android destroys/recreates the owning ViewModel on navigation (e.g. backing out to fix
-Bluetooth), which would otherwise stop the ride. A Gtk.Stack just hides widgets rather than
+Bluetooth), which would otherwise stop the ride. An Adw.ViewStack just hides widgets rather than
 destroying them, so this view can own the RideEngine directly with no separate "service" needed -
 switching away from this screen and back doesn't lose anything.
+
+Deliberately has no header bar or bottom switcher of its own - it's the one screen the persistent
+tab bar hides for (see main_window.py), so the map gets the full window while riding.
 """
 
 from __future__ import annotations
 
 import gi
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import GLib, Gtk  # noqa: E402
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 from ..ble.models import BleConnectionState, HeartRateSample, TrainerSample  # noqa: E402
 from ..ride import gpx_writer  # noqa: E402
@@ -46,7 +50,7 @@ class RideView(Gtk.Overlay):
         self._selected_workout: Workout | None = None
 
         self.map_view = RideMapView()
-        self.add(self.map_view)
+        self.set_child(self.map_view)
 
         self._build_stats_panel()
         self._build_map_controls_panel()
@@ -77,17 +81,18 @@ class RideView(Gtk.Overlay):
                 label = Gtk.Label(label="--")
                 label.set_width_chars(12)
                 self._stat_labels[key] = label
-                row.pack_start(label, False, False, 0)
-            box.pack_start(row, False, False, 0)
+                row.append(label)
+            box.append(row)
 
         self._workout_chart = WorkoutProfileChart()
         self._workout_chart.set_visible(False)
-        box.pack_start(self._workout_chart, False, False, 4)
+        self._workout_chart.set_margin_top(4)
+        box.append(self._workout_chart)
 
         self._status_label = Gtk.Label(xalign=0.0)
-        box.pack_start(self._status_label, False, False, 0)
+        box.append(self._status_label)
 
-        panel.add(box)
+        panel.set_child(box)
         self.add_overlay(panel)
 
     def _build_map_controls_panel(self) -> None:
@@ -102,14 +107,11 @@ class RideView(Gtk.Overlay):
         box.set_margin_start(8)
         box.set_margin_end(8)
 
-        zoom_in = Gtk.Button(label="+")
+        zoom_in = Gtk.Button(icon_name="zoom-in-symbolic")
         zoom_in.connect("clicked", lambda _b: self._adjust_zoom(1.0))
-        zoom_out = Gtk.Button(label="-")
+        zoom_out = Gtk.Button(icon_name="zoom-out-symbolic")
         zoom_out.connect("clicked", lambda _b: self._adjust_zoom(-1.0))
 
-        # GTK has a native vertical Scale, unlike Compose (which needed a hand-built drag
-        # control to avoid a rotated-Slider's touch-target pitfalls) - the real widget is the
-        # simpler option here.
         tilt_label = Gtk.Label(label="Tilt")
         self._tilt_scale = Gtk.Scale(orientation=Gtk.Orientation.VERTICAL)
         self._tilt_scale.set_range(0, _MAX_TILT_DEGREES)
@@ -119,12 +121,12 @@ class RideView(Gtk.Overlay):
         self._tilt_scale.set_size_request(-1, 100)
         self._tilt_scale.connect("value-changed", self._on_tilt_changed)
 
-        box.pack_start(zoom_in, False, False, 0)
-        box.pack_start(zoom_out, False, False, 0)
-        box.pack_start(tilt_label, False, False, 0)
-        box.pack_start(self._tilt_scale, True, True, 0)
+        box.append(zoom_in)
+        box.append(zoom_out)
+        box.append(tilt_label)
+        box.append(self._tilt_scale)
 
-        panel.add(box)
+        panel.set_child(box)
         self.add_overlay(panel)
 
     def _adjust_zoom(self, delta: float) -> None:
@@ -153,19 +155,20 @@ class RideView(Gtk.Overlay):
         self._workout_label = Gtk.Label(label="Workout: None")
         self._workout_button = Gtk.Button(label="Choose")
         self._workout_button.connect("clicked", lambda _b: self._open_workout_picker())
-        self._workout_row.pack_start(self._workout_label, False, False, 0)
-        self._workout_row.pack_start(self._workout_button, False, False, 0)
-        outer.pack_start(self._workout_row, False, False, 4)
+        self._workout_row.append(self._workout_label)
+        self._workout_row.append(self._workout_button)
+        outer.append(self._workout_row)
 
         self._button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._button_box.set_margin_top(4)
         self._button_box.set_margin_bottom(4)
-        outer.pack_start(self._button_box, False, False, 0)
+        outer.append(self._button_box)
 
-        panel.add(outer)
+        panel.set_child(outer)
         self.add_overlay(panel)
 
-        back = Gtk.Button(label="< Routes")
+        back = Gtk.Button(icon_name="go-previous-symbolic")
+        back.set_tooltip_text("Back to Routes")
         back.set_valign(Gtk.Align.START)
         back.set_halign(Gtk.Align.END)
         back.set_margin_top(12)
@@ -284,42 +287,49 @@ class RideView(Gtk.Overlay):
         self.window.show_history()
 
     def _open_workout_picker(self) -> None:
-        dialog = Gtk.Dialog(title="Choose Workout", transient_for=self.window, modal=True)
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL)
-        content = dialog.get_content_area()
-        content.set_margin_top(12)
-        content.set_margin_bottom(12)
-        content.set_margin_start(12)
-        content.set_margin_end(12)
+        dialog = Adw.Dialog(title="Choose Workout", content_width=360, content_height=420)
+        toolbar_view = Adw.ToolbarView()
+        header = Adw.HeaderBar(show_title=True)
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", lambda _b: dialog.close())
+        header.pack_start(cancel_button)
+        toolbar_view.add_top_bar(header)
 
-        list_box = Gtk.ListBox()
         workouts = self.app.workout_repository.workouts
         if not workouts:
-            content.pack_start(
-                Gtk.Label(label="No workouts imported yet. Add one from the Workout Library."),
-                False,
-                False,
-                0,
+            status = Adw.StatusPage(
+                title="No workouts imported",
+                description="Add one from the Workout Library.",
+                icon_name="system-run-symbolic",
             )
+            toolbar_view.set_content(status)
         else:
+            list_box = Gtk.ListBox()
+            list_box.add_css_class("boxed-list")
+            list_box.set_margin_top(12)
+            list_box.set_margin_bottom(12)
+            list_box.set_margin_start(12)
+            list_box.set_margin_end(12)
             none_row = Gtk.ListBoxRow()
-            none_row.add(Gtk.Label(label="None", xalign=0.0))
-            list_box.add(none_row)
+            none_row.set_child(Gtk.Label(label="None", xalign=0.0, margin_top=8, margin_bottom=8))
+            none_row.workout = None  # type: ignore[attr-defined]
+            list_box.append(none_row)
             for workout in workouts:
                 row = Gtk.ListBoxRow()
-                row.add(Gtk.Label(label=workout.name, xalign=0.0))
+                row.set_child(Gtk.Label(label=workout.name, xalign=0.0, margin_top=8, margin_bottom=8))
                 row.workout = workout  # type: ignore[attr-defined]
-                list_box.add(row)
+                list_box.append(row)
             list_box.connect("row-activated", self._on_workout_row_activated, dialog)
-            content.pack_start(list_box, True, True, 0)
+            scroller = Gtk.ScrolledWindow()
+            scroller.set_child(list_box)
+            toolbar_view.set_content(scroller)
 
-        dialog.show_all()
-        dialog.run()
-        dialog.destroy()
+        dialog.set_child(toolbar_view)
+        dialog.present(self.window)
 
-    def _on_workout_row_activated(self, _list_box: Gtk.ListBox, row: Gtk.ListBoxRow, dialog: Gtk.Dialog) -> None:
+    def _on_workout_row_activated(self, _list_box: Gtk.ListBox, row: Gtk.ListBoxRow, dialog: Adw.Dialog) -> None:
         self._set_workout(getattr(row, "workout", None))
-        dialog.destroy()
+        dialog.close()
 
     def _set_workout(self, workout: Workout | None) -> None:
         self._selected_workout = workout
@@ -331,30 +341,36 @@ class RideView(Gtk.Overlay):
         self._workout_button.set_label("Change" if workout else "Choose")
 
     def _render_controls(self) -> None:
-        for child in list(self._button_box.get_children()):
+        child = self._button_box.get_first_child()
+        while child is not None:
+            next_child = child.get_next_sibling()
             self._button_box.remove(child)
+            child = next_child
 
         state = self._engine.stats.state if self._engine is not None else RideState.IDLE
         self._workout_row.set_visible(state == RideState.IDLE)
         if state == RideState.IDLE:
             start_button = Gtk.Button(label="Start Ride")
+            start_button.add_css_class("suggested-action")
             start_button.connect("clicked", lambda _b: self._start())
-            self._button_box.pack_start(start_button, False, False, 0)
+            self._button_box.append(start_button)
         elif state == RideState.RIDING:
             pause_button = Gtk.Button(label="Pause")
             pause_button.connect("clicked", lambda _b: self._pause())
             finish_button = Gtk.Button(label="Finish")
+            finish_button.add_css_class("destructive-action")
             finish_button.connect("clicked", lambda _b: self._finish())
-            self._button_box.pack_start(pause_button, False, False, 0)
-            self._button_box.pack_start(finish_button, False, False, 0)
+            self._button_box.append(pause_button)
+            self._button_box.append(finish_button)
         elif state == RideState.PAUSED:
             resume_button = Gtk.Button(label="Resume")
+            resume_button.add_css_class("suggested-action")
             resume_button.connect("clicked", lambda _b: self._start())
             finish_button = Gtk.Button(label="Finish")
+            finish_button.add_css_class("destructive-action")
             finish_button.connect("clicked", lambda _b: self._finish())
-            self._button_box.pack_start(resume_button, False, False, 0)
-            self._button_box.pack_start(finish_button, False, False, 0)
-        self._button_box.show_all()
+            self._button_box.append(resume_button)
+            self._button_box.append(finish_button)
 
     def _start(self) -> None:
         if self._engine is not None:

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import gi
 
-gi.require_version("Gtk", "3.0")
+gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa: E402
 
 from ..ride.models import Workout  # noqa: E402
@@ -22,7 +22,7 @@ class WorkoutProfileChart(Gtk.DrawingArea):
         self._workout = workout
         self._progress_seconds: float | None = None
         self.set_size_request(-1, 56)
-        self.connect("draw", self._on_draw)
+        self.set_draw_func(self._on_draw)
 
     def set_workout(self, workout: Workout | None) -> None:
         self._workout = workout
@@ -32,17 +32,14 @@ class WorkoutProfileChart(Gtk.DrawingArea):
         self._progress_seconds = seconds
         self.queue_draw()
 
-    def _on_draw(self, widget: Gtk.Widget, cr) -> bool:  # noqa: ANN001 - cairo.Context
-        allocation = widget.get_allocation()
-        width, height = allocation.width, allocation.height
-
+    def _on_draw(self, _area: Gtk.DrawingArea, cr, width: int, height: int) -> None:  # noqa: ANN001 - cairo.Context
         cr.set_source_rgb(0.85, 0.85, 0.85)
         cr.rectangle(0, 0, width, height)
         cr.fill()
 
         workout = self._workout
         if workout is None or not workout.segments:
-            return False
+            return
 
         values = [
             v
@@ -76,5 +73,3 @@ class WorkoutProfileChart(Gtk.DrawingArea):
             cr.move_to(x, 0)
             cr.line_to(x, height)
             cr.stroke()
-
-        return False

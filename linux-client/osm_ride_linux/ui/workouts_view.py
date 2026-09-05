@@ -8,12 +8,14 @@ from pathlib import Path
 
 import gi
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk  # noqa: E402
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from ..ride.models import Workout  # noqa: E402
 from ..ride.workout_repository import WorkoutRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
+from .toolbar_page import ToolbarPage  # noqa: E402
 from .workout_profile_chart import WorkoutProfileChart  # noqa: E402
 
 
@@ -31,137 +33,140 @@ def _average_watts(workout: Workout) -> float | None:
     return weighted_sum / total_seconds if total_seconds > 0 else None
 
 
-class WorkoutsView(Gtk.Box):
+class WorkoutsView(ToolbarPage):
     def __init__(self, window) -> None:  # noqa: ANN001 - MainWindow, avoiding an import cycle
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        super().__init__()
         self.window = window
         self._repo = window.app.workout_repository
 
-        self.set_margin_top(12)
-        self.set_margin_bottom(12)
-        self.set_margin_start(16)
-        self.set_margin_end(16)
-
-        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        back = Gtk.Button(label="< Back")
-        back.connect("clicked", lambda _b: window.show_history())
-        create_button = Gtk.Button(label="Create Workout...")
+        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Workouts"))
+        create_button = Gtk.Button(label="Create Workout…")
         create_button.connect("clicked", lambda _b: window.show_workout_creator_new())
-        import_button = Gtk.Button(label="Import Workout...")
+        import_button = Gtk.Button(label="Import…")
         import_button.connect("clicked", self._on_import_clicked)
-        header.pack_start(back, False, False, 0)
-        header.pack_start(Gtk.Label(label="Workout Library"), False, False, 0)
-        header.pack_end(import_button, False, False, 0)
-        header.pack_end(create_button, False, False, 0)
+        header.pack_end(create_button)
+        header.pack_end(import_button)
+        self.add_top_bar(header)
 
-        self._empty_label = Gtk.Label(label="No workouts yet. Import an .erg, .mrc, or .zwo file.")
-        self._list_box = Gtk.ListBox()
-        self._list_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        outer.set_margin_top(16)
+        outer.set_margin_bottom(16)
+        outer.set_margin_start(16)
+        outer.set_margin_end(16)
+        outer.set_valign(Gtk.Align.START)
+
+        self._empty_status = Adw.StatusPage(
+            title="No workouts yet",
+            description="Import an .erg, .mrc, or .zwo file, or build one from scratch.",
+            icon_name="system-run-symbolic",
+        )
+        self._workouts_group = Adw.PreferencesGroup()
+        self._workout_rows: list[Gtk.Widget] = []
+
+        outer.append(self._empty_status)
+        outer.append(self._workouts_group)
+
         scroller = Gtk.ScrolledWindow()
-        scroller.set_vexpand(True)
-        scroller.add(self._list_box)
-
-        self.pack_start(header, False, False, 0)
-        self.pack_start(self._empty_label, False, False, 12)
-        self.pack_start(scroller, True, True, 0)
+        scroller.set_child(outer)
+        self.set_content(scroller)
 
         self._repo.on_workouts_changed = lambda _w: self.refresh()
         self.refresh()
 
     def refresh(self) -> None:
-        for child in list(self._list_box.get_children()):
-            self._list_box.remove(child)
-
         workouts = self._repo.workouts
-        self._empty_label.set_visible(len(workouts) == 0)
-        for workout in workouts:
-            self._list_box.add(self._build_row(workout))
-        self._list_box.show_all()
+        self._empty_status.set_visible(len(workouts) == 0)
+        self._workouts_group.set_visible(len(workouts) > 0)
 
-    def _build_row(self, workout: Workout) -> Gtk.ListBoxRow:
-        row = Gtk.ListBoxRow()
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        outer.set_margin_top(8)
-        outer.set_margin_bottom(8)
-        outer.set_margin_start(12)
-        outer.set_margin_end(12)
+        for row in self._workout_rows:
+            self._workouts_group.remove(row)
+        self._workout_rows = [self._build_row(workout) for workout in workouts]
+        for row in self._workout_rows:
+            self._workouts_group.add(row)
 
-        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    def _build_row(self, workout: Workout) -> Gtk.Widget:
         avg_watts = _average_watts(workout)
         summary_text = units.format_duration(workout.total_duration_seconds)
         if avg_watts is not None:
             summary_text += f"  ·  avg {units.format_watts(avg_watts)}"
-        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        info_box.pack_start(Gtk.Label(label=workout.name, xalign=0.0), False, False, 0)
-        info_box.pack_start(Gtk.Label(label=summary_text, xalign=0.0), False, False, 0)
-        top_row.pack_start(info_box, True, True, 0)
 
-        edit_blocks_button = Gtk.Button(label="Edit Blocks")
+        row = Adw.ExpanderRow(title=workout.name, subtitle=summary_text)
+
+        edit_blocks_button = Gtk.Button(icon_name="view-pin-symbolic", valign=Gtk.Align.CENTER)
+        edit_blocks_button.set_tooltip_text("Edit Blocks")
+        edit_blocks_button.add_css_class("flat")
         edit_blocks_button.connect("clicked", lambda _b, w=workout: self.window.show_workout_creator_edit(w.id))
-        rename_button = Gtk.Button(label="Rename")
+        row.add_suffix(edit_blocks_button)
+
+        rename_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
+        rename_button.set_tooltip_text("Rename")
+        rename_button.add_css_class("flat")
         rename_button.connect("clicked", lambda _b, w=workout: self._rename(w))
-        delete_button = Gtk.Button(label="Delete")
+        row.add_suffix(rename_button)
+
+        delete_button = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
+        delete_button.set_tooltip_text("Delete")
+        delete_button.add_css_class("flat")
         delete_button.connect("clicked", lambda _b, w=workout: self._delete(w))
-        top_row.pack_start(edit_blocks_button, False, False, 0)
-        top_row.pack_start(rename_button, False, False, 0)
-        top_row.pack_start(delete_button, False, False, 0)
+        row.add_suffix(delete_button)
 
         chart = WorkoutProfileChart(workout)
+        chart.set_margin_start(12)
+        chart.set_margin_end(12)
+        chart.set_margin_bottom(12)
+        chart_row = Adw.ActionRow()
+        chart_row.set_child(chart)
+        row.add_row(chart_row)
 
-        outer.pack_start(top_row, False, False, 0)
-        outer.pack_start(chart, False, False, 0)
-        row.add(outer)
         return row
 
     def _rename(self, workout: Workout) -> None:
-        dialog = Gtk.Dialog(title="Rename Workout", transient_for=self.window, modal=True)
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Save", Gtk.ResponseType.OK)
-        content = dialog.get_content_area()
-        content.set_margin_top(12)
-        content.set_margin_bottom(12)
-        content.set_margin_start(12)
-        content.set_margin_end(12)
+        dialog = Adw.AlertDialog.new("Rename Workout", None)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("save", "Save")
+        dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
         entry = Gtk.Entry()
         entry.set_text(workout.name)
-        content.pack_start(entry, False, False, 0)
+        dialog.set_extra_child(entry)
 
-        dialog.show_all()
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            new_name = entry.get_text().strip() or workout.name
-            self._repo.rename_workout(workout.id, new_name)
-        dialog.destroy()
+        def on_response(_dialog: Adw.AlertDialog, response: str) -> None:
+            if response == "save":
+                new_name = entry.get_text().strip() or workout.name
+                self._repo.rename_workout(workout.id, new_name)
+
+        dialog.connect("response", on_response)
+        dialog.present(self.window)
 
     def _delete(self, workout: Workout) -> None:
         self._repo.delete_workout(workout.id)
 
     def _on_import_clicked(self, _button: Gtk.Button) -> None:
-        dialog = Gtk.FileChooserNative.new(
-            "Import Workout File", self.window, Gtk.FileChooserAction.OPEN, "Import", "Cancel"
-        )
+        dialog = Gtk.FileDialog(title="Import Workout File")
         workout_filter = Gtk.FileFilter()
         workout_filter.set_name("Workout files")
         for pattern in ("*.erg", "*.mrc", "*.zwo"):
             workout_filter.add_pattern(pattern)
-        dialog.add_filter(workout_filter)
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(workout_filter)
+        dialog.set_filters(filters)
+        dialog.open(self.window, None, self._on_import_file_chosen)
 
-        response = dialog.run()
-        if response == Gtk.ResponseType.ACCEPT:
-            path = Path(dialog.get_filename())
-            ftp_watts = self.window.app.prefs.get_ftp_watts()
-            try:
-                self._repo.import_workout(path, path.name, ftp_watts)
-            except WorkoutRepositoryError as e:
-                self._show_error(str(e))
-        dialog.destroy()
+    def _on_import_file_chosen(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult) -> None:
+        try:
+            file = dialog.open_finish(result)
+        except GLib.Error:
+            return  # cancelled
+        path = Path(file.get_path())
+        ftp_watts = self.window.app.prefs.get_ftp_watts()
+        try:
+            self._repo.import_workout(path, path.name, ftp_watts)
+        except WorkoutRepositoryError as e:
+            self._show_error(str(e))
 
     def _show_error(self, message: str) -> None:
-        dialog = Gtk.MessageDialog(
-            transient_for=self.window,
-            modal=True,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text=message,
-        )
-        dialog.run()
-        dialog.destroy()
+        dialog = Adw.AlertDialog.new("Import Failed", message)
+        dialog.add_response("ok", "OK")
+        dialog.present(self.window)

@@ -23,18 +23,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system GTK3/WebKit2GTK bindings
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 python3-venv
-
-      # Same venv --system-site-packages recipe documented in README.md's "Running it" section -
-      # PyGObject is a system package, not pip-installable, so the venv needs to see it while
-      # still keeping pip installs (bleak, pytest) out of the way.
+      # No GTK/libadwaita/WebKit system bindings needed here - the domain-logic test suite
+      # (ble/route/ride/workout parsing and repositories) never imports `gi` (confirmed: no
+      # non-UI module under osm_ride_linux/ does), so a plain venv suffices. The UI itself only
+      # runs against the org.gnome.Platform Flatpak/GNOME runtime now (see README.md's
+      # "Development environment" section) - there's no system package set for it to test
+      # against on this runner, or on RHEL 9/10 for that matter.
       - name: Create venv and install Python dependencies
         working-directory: linux-client
         run: |
-          python3 -m venv --system-site-packages .venv
+          python3 -m venv .venv
           source .venv/bin/activate
           pip install -r requirements.txt
 

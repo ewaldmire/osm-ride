@@ -1,17 +1,23 @@
-"""Top-level window: a Gtk.Stack switches between full-screen views, with a persistent
-BottomNavBar packed below it (hidden only on "ride" - the map needs the full window while
-riding). Simpler than Android Navigation's back-stack - GTK apps don't have a system back button
-to wire up, and every screen here can always get back to history via the bottom bar, so a flat
+"""Top-level window: an Adw.ViewStack switches between full-screen views, with libadwaita's
+built-in Adw.ViewSwitcherBar as the persistent bottom tab bar - hidden only on "ride" (the map
+needs the full window while riding). Only the four tab screens (History/Routes/Workouts/
+Settings) are added with add_titled_with_icon() so they get a switcher button; sub-screens
+(Pairing, Ride, the two Creators) are added with add_named() so the stack can navigate to them
+without the switcher ever showing a button - and without highlighting any tab - for them, mirroring
+the "no tab active on sub-screens" behavior the GTK3 version's custom bar had.
+
+Simpler than Android Navigation's back-stack - GTK apps don't have a system back button to wire
+up, and every screen here can always get back to history via the switcher bar, so a flat
 named-page stack is enough."""
 
 from __future__ import annotations
 
 import gi
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk  # noqa: E402
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw  # noqa: E402
 
-from .bottom_nav_bar import BottomNavBar
 from .history_view import HistoryView
 from .pairing_view import PairingView
 from .ride_view import RideView
@@ -22,35 +28,27 @@ from .workout_creator_view import WorkoutCreatorView
 from .workouts_view import WorkoutsView
 
 
-class MainWindow(Gtk.ApplicationWindow):
+class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app) -> None:  # noqa: ANN001 - OsmRideApplication, avoiding an import cycle
-        super().__init__(application=app, title="OSM Ride")
+        super().__init__(application=app, title="OSM Ride", default_width=1000, default_height=700)
         self.app = app
-        self.set_default_size(1000, 700)
 
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        self.add(outer)
-
-        self.stack = Gtk.Stack()
-        self.bottom_nav = BottomNavBar(self)
-        outer.pack_start(self.stack, True, True, 0)
-        outer.pack_start(self.bottom_nav, False, False, 0)
-        self.stack.connect("notify::visible-child-name", self._on_page_changed)
+        self.stack = Adw.ViewStack()
 
         self.history_view = HistoryView(self)
-        self.stack.add_named(self.history_view, "history")
+        self.stack.add_titled_with_icon(self.history_view, "history", "History", "document-open-recent-symbolic")
+
+        self.routes_view = RoutesView(self)
+        self.stack.add_titled_with_icon(self.routes_view, "routes", "Routes", "mark-location-symbolic")
+
+        self.workouts_view = WorkoutsView(self)
+        self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workouts", "system-run-symbolic")
 
         self.settings_view = SettingsView(self)
-        self.stack.add_named(self.settings_view, "settings")
+        self.stack.add_titled_with_icon(self.settings_view, "settings", "Settings", "preferences-system-symbolic")
 
         self.pairing_view = PairingView(self)
         self.stack.add_named(self.pairing_view, "pairing")
-
-        self.routes_view = RoutesView(self)
-        self.stack.add_named(self.routes_view, "routes")
-
-        self.workouts_view = WorkoutsView(self)
-        self.stack.add_named(self.workouts_view, "workouts")
 
         self.ride_view = RideView(self)
         self.stack.add_named(self.ride_view, "ride")
@@ -61,13 +59,21 @@ class MainWindow(Gtk.ApplicationWindow):
         self.workout_creator_view = WorkoutCreatorView(self)
         self.stack.add_named(self.workout_creator_view, "workout_creator")
 
-        self.stack.set_visible_child_name("history")
-        self.show_all()
+        self.view_switcher_bar = Adw.ViewSwitcherBar()
+        self.view_switcher_bar.set_stack(self.stack)
+        self.view_switcher_bar.set_reveal(True)
 
-    def _on_page_changed(self, _stack: Gtk.Stack, _pspec) -> None:  # noqa: ANN001
+        toolbar_view = Adw.ToolbarView()
+        toolbar_view.set_content(self.stack)
+        toolbar_view.add_bottom_bar(self.view_switcher_bar)
+        self.set_content(toolbar_view)
+
+        self.stack.connect("notify::visible-child-name", self._on_page_changed)
+        self.stack.set_visible_child_name("history")
+
+    def _on_page_changed(self, _stack: Adw.ViewStack, _pspec) -> None:  # noqa: ANN001
         name = self.stack.get_visible_child_name()
-        self.bottom_nav.set_visible(name != "ride")
-        self.bottom_nav.set_active_page(name)
+        self.view_switcher_bar.set_reveal(name != "ride")
 
     def show_history(self) -> None:
         self.stack.set_visible_child_name("history")
@@ -103,23 +109,3 @@ class MainWindow(Gtk.ApplicationWindow):
     def show_workout_creator_edit(self, workout_id: str) -> None:
         self.workout_creator_view.start_edit(workout_id)
         self.stack.set_visible_child_name("workout_creator")
-
-    def show_placeholder(self, name: str, title: str) -> None:
-        """Temporary stand-in for screens not built yet (Routes/Workouts/Settings/Ride) - a
-        real label, not a silent no-op, so it's obvious in the running app what's missing."""
-        if self.stack.get_child_by_name(name) is None:
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-            box.set_valign(Gtk.Align.CENTER)
-            box.set_halign(Gtk.Align.CENTER)
-            label = Gtk.Label(label=f"{title}\n(not built yet)")
-            label.set_justify(Gtk.Justification.CENTER)
-            back = Gtk.Button(label="Back to History")
-            back.connect("clicked", lambda _b: self.show_history())
-            box.pack_start(label, False, False, 0)
-            box.pack_start(back, False, False, 0)
-            self.stack.add_named(box, name)
-            # GTK3 widgets aren't visible by default when constructed, and Gtk.Stack won't
-            # switch to a child that isn't - the window's one-time show_all() at construction
-            # predates this child existing, so it needs its own.
-            box.show_all()
-        self.stack.set_visible_child_name(name)
