@@ -18,7 +18,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 from ..ble.models import BleConnectionState, HeartRateSample, TrainerSample  # noqa: E402
 from ..ride import gpx_writer  # noqa: E402
@@ -35,6 +35,20 @@ _MIN_ZOOM = 12.0
 _MAX_ZOOM = 20.0
 _DEFAULT_TILT_DEGREES = 55.0
 _MAX_TILT_DEGREES = 80.0
+_DRAG_BAR_HEIGHT = 36
+_LEFT_COLUMN_WIDTH = 280
+
+# Overlay panels sit directly on the map, which can be anything from open sky to a dense city
+# block - a translucent-but-legible white card (rather than each Gtk.Frame's near-invisible
+# default styling) keeps them readable regardless of what's underneath, mirroring the Android
+# StatsCard's Surface(color = ...copy(alpha = 0.92f), shadowElevation = 4.dp).
+_PANEL_CSS = """
+.ride-panel-card {
+  background-color: rgba(255, 255, 255, 0.88);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+"""
 
 
 class RideView(Gtk.Overlay):
@@ -53,10 +67,18 @@ class RideView(Gtk.Overlay):
         self.map_view = RideMapView()
         self.set_child(self.map_view)
 
+        self._load_panel_css()
         self._build_drag_bar()
-        self._build_stats_panel()
+        self._build_back_button()
+        self._build_left_column()
         self._build_map_controls_panel()
-        self._build_controls_panel()
+
+    def _load_panel_css(self) -> None:
+        provider = Gtk.CssProvider()
+        provider.load_from_string(_PANEL_CSS)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
     def _build_drag_bar(self) -> None:
         # The ride screen is the one place in the app with no Adw.HeaderBar (the map wants the
@@ -69,7 +91,7 @@ class RideView(Gtk.Overlay):
         handle.set_halign(Gtk.Align.FILL)
 
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        bar.set_size_request(-1, 36)
+        bar.set_size_request(-1, _DRAG_BAR_HEIGHT)
         bar.add_css_class("osd")  # subtle translucent dark strip, standard style for map overlays
         spacer = Gtk.Box(hexpand=True)
         controls = Gtk.WindowControls(side=Gtk.PackType.END)
@@ -81,12 +103,36 @@ class RideView(Gtk.Overlay):
 
         self.add_overlay(handle)
 
-    def _build_stats_panel(self) -> None:
+    def _build_back_button(self) -> None:
+        back = Gtk.Button(icon_name="go-previous-symbolic")
+        back.set_tooltip_text("Back to Routes")
+        back.set_valign(Gtk.Align.START)
+        back.set_halign(Gtk.Align.END)
+        back.set_margin_top(_DRAG_BAR_HEIGHT + 12)
+        back.set_margin_end(12)
+        back.connect("clicked", lambda _b: self.window.show_routes())
+        self.add_overlay(back)
+
+    def _build_left_column(self) -> None:
+        # Mirrors RideScreen.kt's landscape layout - stats card and pause/finish stacked
+        # together on the left, in a narrow column, leaving the rest of the map free (rather
+        # than the portrait layout's stats-on-top/controls-on-bottom split, which wastes more
+        # of a wide desktop window).
+        column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        column.set_valign(Gtk.Align.START)
+        column.set_halign(Gtk.Align.START)
+        column.set_margin_top(_DRAG_BAR_HEIGHT + 12)
+        column.set_margin_start(12)
+        column.set_size_request(_LEFT_COLUMN_WIDTH, -1)
+
+        column.append(self._build_stats_panel())
+        column.append(self._build_controls_panel())
+
+        self.add_overlay(column)
+
+    def _build_stats_panel(self) -> Gtk.Widget:
         panel = Gtk.Frame()
-        panel.set_valign(Gtk.Align.START)
-        panel.set_halign(Gtk.Align.START)
-        panel.set_margin_top(12)
-        panel.set_margin_start(12)
+        panel.add_css_class("ride-panel-card")
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.set_margin_top(8)
@@ -126,10 +172,11 @@ class RideView(Gtk.Overlay):
         box.append(self._status_label)
 
         panel.set_child(box)
-        self.add_overlay(panel)
+        return panel
 
     def _build_map_controls_panel(self) -> None:
         panel = Gtk.Frame()
+        panel.add_css_class("ride-panel-card")
         panel.set_valign(Gtk.Align.CENTER)
         panel.set_halign(Gtk.Align.END)
         panel.set_margin_end(12)
@@ -170,11 +217,9 @@ class RideView(Gtk.Overlay):
         self._tilt_degrees = scale.get_value()
         self.map_view.reset_manual_override()
 
-    def _build_controls_panel(self) -> None:
+    def _build_controls_panel(self) -> Gtk.Widget:
         panel = Gtk.Frame()
-        panel.set_valign(Gtk.Align.END)
-        panel.set_halign(Gtk.Align.CENTER)
-        panel.set_margin_bottom(12)
+        panel.add_css_class("ride-panel-card")
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer.set_margin_top(4)
@@ -198,16 +243,7 @@ class RideView(Gtk.Overlay):
         outer.append(self._button_box)
 
         panel.set_child(outer)
-        self.add_overlay(panel)
-
-        back = Gtk.Button(icon_name="go-previous-symbolic")
-        back.set_tooltip_text("Back to Routes")
-        back.set_valign(Gtk.Align.START)
-        back.set_halign(Gtk.Align.END)
-        back.set_margin_top(12)
-        back.set_margin_end(12)
-        back.connect("clicked", lambda _b: self.window.show_routes())
-        self.add_overlay(back)
+        return panel
 
     def load_route(self, route_id: str) -> None:
         if self._route is not None and self._route.id == route_id:
