@@ -19,8 +19,10 @@ from . import route_thumbnail_generator  # noqa: E402
 from .route_thumbnail_image import RouteThumbnailImage  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
 
-_THUMBNAIL_DISPLAY_WIDTH = 64
-_THUMBNAIL_DISPLAY_HEIGHT = 40
+# Same 5:3 aspect ratio as the generated PNG (see route_thumbnail_generator.py's
+# _THUMBNAIL_WIDTH/_THUMBNAIL_HEIGHT) so the display scale is uniform, not stretched.
+_THUMBNAIL_DISPLAY_WIDTH = 160
+_THUMBNAIL_DISPLAY_HEIGHT = 96
 
 
 class RoutesView(ToolbarPage):
@@ -81,7 +83,7 @@ class RoutesView(ToolbarPage):
             return thumbnail
         # No cached snapshot yet (not generated, still generating, or this route predates the
         # feature) - a plain icon placeholder rather than leaving a gap.
-        placeholder = Gtk.Image(icon_name="mark-location-symbolic", pixel_size=24)
+        placeholder = Gtk.Image(icon_name="mark-location-symbolic", pixel_size=40)
         placeholder.add_css_class("dim-label")
         placeholder.add_css_class("card")
         placeholder.set_size_request(_THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT)

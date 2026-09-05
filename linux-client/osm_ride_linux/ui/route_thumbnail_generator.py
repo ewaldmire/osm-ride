@@ -40,6 +40,13 @@ _HARD_TIMEOUT_MS = 15000
 def generate(route: Route, destination_path: Path, on_done: Callable[[bool], None]) -> None:
     """Fire-and-forget: on_done(success) is called exactly once, regardless of outcome."""
     window = Gtk.Window(default_width=_THUMBNAIL_WIDTH, default_height=_THUMBNAIL_HEIGHT)
+    # Fully transparent + undecorated: WebKit still needs a real presented window to render into
+    # (see module docstring - GTK4 dropped the off-screen render path), but there's no reason the
+    # user needs to see it flash on screen. get_snapshot() reads WebKit's own render texture
+    # directly, not the window's composited framebuffer, so zero opacity doesn't affect the
+    # captured content.
+    window.set_decorated(False)
+    window.set_opacity(0.0)
     content_manager = WebKit.UserContentManager()
     content_manager.register_script_message_handler("pageReady")
     webview = WebKit.WebView(user_content_manager=content_manager)

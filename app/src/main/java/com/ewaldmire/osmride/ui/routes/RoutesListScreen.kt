@@ -226,8 +226,10 @@ private fun RouteCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Same 5:3 aspect ratio as the generated PNG (see RouteThumbnailGenerator's
+            // THUMBNAIL_WIDTH/THUMBNAIL_HEIGHT) so the display scale is uniform, not stretched.
             Box(
-                modifier = Modifier.size(width = 64.dp, height = 40.dp).clip(RoundedCornerShape(8.dp)),
+                modifier = Modifier.size(width = 160.dp, height = 96.dp).clip(RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (bitmap != null) {
@@ -244,7 +246,7 @@ private fun RouteCard(
                         Icon(
                             Icons.Filled.Place,
                             contentDescription = null,
-                            modifier = Modifier.align(Alignment.Center),
+                            modifier = Modifier.align(Alignment.Center).size(32.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
