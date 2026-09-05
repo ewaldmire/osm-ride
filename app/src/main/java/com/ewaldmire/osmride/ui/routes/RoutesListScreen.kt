@@ -1,18 +1,24 @@
 package com.ewaldmire.osmride.ui.routes
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddRoad
 import androidx.compose.material.icons.filled.ArrowBack
@@ -20,6 +26,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditLocationAlt
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -47,12 +54,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.route.RouteSummary
 import com.ewaldmire.osmride.util.Units
+import java.io.File
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,6 +161,7 @@ fun RoutesListScreen(
                 items(routes, key = { it.id }) { route ->
                     RouteCard(
                         route = route,
+                        thumbnailFile = viewModel.thumbnailFile(route),
                         onClick = { selectRoute(route.id) },
                         onRename = { renamingRoute = route },
                         onEditRoute = { onEditRoute(route.id) },
@@ -196,17 +208,49 @@ private fun EmptyState(padding: PaddingValues) {
 @Composable
 private fun RouteCard(
     route: RouteSummary,
+    thumbnailFile: File?,
     onClick: () -> Unit,
     onRename: () -> Unit,
     onEditRoute: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    // Cheap to decode on every recomposition at this size (a small cached PNG, not the full map)
+    // and avoids pulling in an image-loading library just for this one static-per-file bitmap.
+    val bitmap = remember(thumbnailFile) {
+        thumbnailFile?.let { file -> BitmapFactory.decodeFile(file.path)?.asImageBitmap() }
+    }
+
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier.size(width = 64.dp, height = 40.dp).clip(RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    // No cached snapshot yet (not generated, still generating, or this route
+                    // predates the feature) - a plain icon placeholder rather than a gap.
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        Icon(
+                            Icons.Filled.Place,
+                            contentDescription = null,
+                            modifier = Modifier.align(Alignment.Center),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(route.name, style = MaterialTheme.typography.titleMedium)
                 Text(
                     "${Units.formatMiles(route.totalDistanceMeters)} · " +

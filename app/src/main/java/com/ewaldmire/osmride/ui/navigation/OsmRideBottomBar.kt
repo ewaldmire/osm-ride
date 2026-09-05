@@ -1,9 +1,9 @@
 package com.ewaldmire.osmride.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -15,9 +15,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 private data class BottomBarTab(val route: String, val label: String, val icon: ImageVector)
 
+// "Ride" (not "Routes") - this tab is the primary way to start riding, not a separate browsing
+// library; it's the same route list/create/import screen underneath, just reframed as an action.
 private val bottomBarTabs = listOf(
     BottomBarTab(Destinations.HISTORY, "History", Icons.Filled.History),
-    BottomBarTab(Destinations.ROUTES_LIST, "Routes", Icons.Filled.Map),
+    BottomBarTab(Destinations.ROUTES_LIST, "Ride", Icons.Filled.DirectionsBike),
     BottomBarTab(Destinations.WORKOUTS_LIST, "Workouts", Icons.Filled.FitnessCenter),
     BottomBarTab(Destinations.SETTINGS, "Settings", Icons.Filled.Settings),
 )

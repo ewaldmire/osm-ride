@@ -89,11 +89,31 @@ class RouteRepository:
         updated = [replace(r, name=resolved) if r.id == route_id else r for r in self.routes]
         self._update_routes(updated)
 
+    def set_thumbnail(self, route_id: str, thumbnail_file_name: str) -> None:
+        """Called once a RouteThumbnailGenerator snapshot finishes - never blocks
+        import/save, since generation happens asynchronously afterward."""
+        updated = [
+            replace(r, thumbnail_file_name=thumbnail_file_name) if r.id == route_id else r for r in self.routes
+        ]
+        self._update_routes(updated)
+
+    def thumbnail_path(self, summary: RouteSummary) -> Path | None:
+        if summary.thumbnail_file_name is None:
+            return None
+        return self._routes_dir / summary.thumbnail_file_name
+
+    @property
+    def directory(self) -> Path:
+        return self._routes_dir
+
     def delete_route(self, route_id: str) -> None:
         summary = self.get_route_summary(route_id)
         if summary is None:
             return
         (self._routes_dir / summary.file_name).unlink(missing_ok=True)
+        thumb_path = self.thumbnail_path(summary)
+        if thumb_path is not None:
+            thumb_path.unlink(missing_ok=True)
         self._update_routes([r for r in self.routes if r.id != route_id])
 
     def save_created_route(
@@ -167,4 +187,5 @@ def _route_summary_from_dict(d: dict) -> RouteSummary:
         elevation_gain_meters=d["elevation_gain_meters"],
         imported_at_epoch_millis=d["imported_at_epoch_millis"],
         waypoints=[RouteWaypoint(**wp) for wp in waypoints] if waypoints else None,
+        thumbnail_file_name=d.get("thumbnail_file_name"),
     )

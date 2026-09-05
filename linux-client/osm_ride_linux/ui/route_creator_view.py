@@ -19,6 +19,7 @@ from ..route import gpx as gpx_module  # noqa: E402
 from ..route.models import RouteWaypoint  # noqa: E402
 from ..route.repository import RouteRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
+from . import route_thumbnail_generator  # noqa: E402
 from .route_creator_map_view import RouteCreatorMapView  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
 
@@ -171,11 +172,29 @@ class RouteCreatorView(ToolbarPage):
             return
         name = self._name_entry.get_text().strip() or "New Route"
         try:
-            self._repo.save_created_route(self._existing_id, name, self._raw_gpx_text, list(self._waypoints))
+            summary = self._repo.save_created_route(
+                self._existing_id, name, self._raw_gpx_text, list(self._waypoints)
+            )
         except RouteRepositoryError as e:
             self._show_error(str(e))
             return
+        self._generate_thumbnail(summary)
         self.window.show_routes()
+
+    def _generate_thumbnail(self, summary) -> None:  # noqa: ANN001 - RouteSummary
+        # Re-editing a route's waypoints changes its shape, so its cached thumbnail (if any) is
+        # now stale - regenerate unconditionally rather than only for brand-new routes.
+        route = self._repo.load_route(summary.id)
+        if route is None:
+            return
+        thumbnail_file_name = f"{summary.id}_thumb.png"
+        destination = self._repo.directory / thumbnail_file_name
+
+        def on_done(success: bool) -> None:
+            if success:
+                self._repo.set_thumbnail(summary.id, thumbnail_file_name)
+
+        route_thumbnail_generator.generate(route, destination, on_done)
 
     def _show_error(self, message: str) -> None:
         dialog = Adw.AlertDialog.new("Error", message)

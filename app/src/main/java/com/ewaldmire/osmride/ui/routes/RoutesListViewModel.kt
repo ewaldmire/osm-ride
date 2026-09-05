@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.ewaldmire.osmride.OsmRideApp
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.route.RouteSummary
+import com.ewaldmire.osmride.route.RouteThumbnailGenerator
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +30,19 @@ class RoutesListViewModel(application: Application) : AndroidViewModel(applicati
     fun importGpx(uri: Uri, displayNameHint: String?) {
         viewModelScope.launch {
             repository.importGpx(uri, displayNameHint)
+                .onSuccess { summary -> generateThumbnail(summary) }
                 .onFailure { _importError.value = it.message ?: "Could not import that GPX file" }
+        }
+    }
+
+    private fun generateThumbnail(summary: RouteSummary) {
+        viewModelScope.launch {
+            val route = repository.loadRoute(summary.id) ?: return@launch
+            val fileName = "${summary.id}_thumb.png"
+            val destination = File(repository.directory, fileName)
+            if (RouteThumbnailGenerator.generate(app, route, destination)) {
+                repository.setThumbnail(summary.id, fileName)
+            }
         }
     }
 
@@ -43,4 +57,6 @@ class RoutesListViewModel(application: Application) : AndroidViewModel(applicati
     fun renameRoute(id: String, name: String) {
         viewModelScope.launch { repository.renameRoute(id, name) }
     }
+
+    fun thumbnailFile(summary: RouteSummary): File? = repository.thumbnailFile(summary)
 }

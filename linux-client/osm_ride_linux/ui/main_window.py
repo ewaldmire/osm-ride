@@ -20,6 +20,7 @@ from gi.repository import Adw  # noqa: E402
 
 from .history_view import HistoryView
 from .pairing_view import PairingView
+from .ride_summary_view import RideSummaryView
 from .ride_view import RideView
 from .route_creator_view import RouteCreatorView
 from .routes_view import RoutesView
@@ -39,7 +40,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.add_titled_with_icon(self.history_view, "history", "History", "document-open-recent-symbolic")
 
         self.routes_view = RoutesView(self)
-        self.stack.add_titled_with_icon(self.routes_view, "routes", "Routes", "mark-location-symbolic")
+        # "Ride" (not "Routes") - this tab is the primary way to start riding, not a separate
+        # browsing library; it's the same route list/create/import screen, just reframed as an
+        # action, matching Android's OsmRideBottomBar.kt.
+        self.stack.add_titled_with_icon(self.routes_view, "routes", "Ride", "mark-location-symbolic")
 
         self.workouts_view = WorkoutsView(self)
         self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workouts", "system-run-symbolic")
@@ -52,6 +56,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.ride_view = RideView(self)
         self.stack.add_named(self.ride_view, "ride")
+
+        self.ride_summary_view = RideSummaryView(self)
+        self.stack.add_named(self.ride_summary_view, "ride_summary")
 
         self.route_creator_view = RouteCreatorView(self)
         self.stack.add_named(self.route_creator_view, "route_creator")
@@ -93,6 +100,10 @@ class MainWindow(Adw.ApplicationWindow):
     def show_ride(self, route_id: str) -> None:
         self.ride_view.load_route(route_id)
         self.stack.set_visible_child_name("ride")
+
+    def show_ride_summary(self, record) -> None:  # noqa: ANN001 - RideRecord, avoiding an import cycle
+        self.ride_summary_view.start(record)
+        self.stack.set_visible_child_name("ride_summary")
 
     def show_route_creator_new(self) -> None:
         self.route_creator_view.start_new()

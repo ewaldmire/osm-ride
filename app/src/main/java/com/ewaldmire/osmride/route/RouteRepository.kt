@@ -134,9 +134,24 @@ class RouteRepository(context: Context) {
         saveIndex(updated)
     }
 
+    /** Called once a RouteThumbnailGenerator snapshot finishes - never blocks import/save,
+     * since generation happens asynchronously afterward. */
+    suspend fun setThumbnail(id: String, thumbnailFileName: String) = withContext(Dispatchers.IO) {
+        val updated = _routes.value.map { if (it.id == id) it.copy(thumbnailFileName = thumbnailFileName) else it }
+        _routes.value = updated
+        saveIndex(updated)
+    }
+
+    fun thumbnailFile(summary: RouteSummary): File? =
+        summary.thumbnailFileName?.let { File(routesDir, it) }
+
+    /** Where a newly-generated thumbnail file should be written - see RouteThumbnailGenerator. */
+    val directory: File get() = routesDir
+
     suspend fun deleteRoute(id: String) = withContext(Dispatchers.IO) {
         val summary = _routes.value.find { it.id == id } ?: return@withContext
         File(routesDir, summary.fileName).delete()
+        thumbnailFile(summary)?.delete()
         val updated = _routes.value.filterNot { it.id == id }
         _routes.value = updated
         saveIndex(updated)

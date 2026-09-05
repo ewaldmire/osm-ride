@@ -36,7 +36,7 @@ _MAX_ZOOM = 20.0
 _DEFAULT_TILT_DEGREES = 55.0
 _MAX_TILT_DEGREES = 80.0
 _DRAG_BAR_HEIGHT = 36
-_LEFT_COLUMN_WIDTH = 280
+_STATS_PANEL_WIDTH = 230
 
 # Overlay panels sit directly on the map, which can be anything from open sky to a dense city
 # block - a translucent-but-legible white card (rather than each Gtk.Frame's near-invisible
@@ -70,7 +70,8 @@ class RideView(Gtk.Overlay):
         self._load_panel_css()
         self._build_drag_bar()
         self._build_back_button()
-        self._build_left_column()
+        self._build_stats_panel()
+        self._build_controls_panel()
         self._build_map_controls_panel()
 
     def _load_panel_css(self) -> None:
@@ -105,7 +106,7 @@ class RideView(Gtk.Overlay):
 
     def _build_back_button(self) -> None:
         back = Gtk.Button(icon_name="go-previous-symbolic")
-        back.set_tooltip_text("Back to Routes")
+        back.set_tooltip_text("Back to Ride")
         back.set_valign(Gtk.Align.START)
         back.set_halign(Gtk.Align.END)
         back.set_margin_top(_DRAG_BAR_HEIGHT + 12)
@@ -113,39 +114,28 @@ class RideView(Gtk.Overlay):
         back.connect("clicked", lambda _b: self.window.show_routes())
         self.add_overlay(back)
 
-    def _build_left_column(self) -> None:
-        # Mirrors RideScreen.kt's landscape layout - stats card and pause/finish stacked
-        # together on the left, in a narrow column, leaving the rest of the map free (rather
-        # than the portrait layout's stats-on-top/controls-on-bottom split, which wastes more
-        # of a wide desktop window).
-        column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        column.set_valign(Gtk.Align.START)
-        column.set_halign(Gtk.Align.START)
-        column.set_margin_top(_DRAG_BAR_HEIGHT + 12)
-        column.set_margin_start(12)
-        column.set_size_request(_LEFT_COLUMN_WIDTH, -1)
-
-        column.append(self._build_stats_panel())
-        column.append(self._build_controls_panel())
-
-        self.add_overlay(column)
-
-    def _build_stats_panel(self) -> Gtk.Widget:
+    def _build_stats_panel(self) -> None:
+        # Pinned independently from the controls panel below (not stacked in a shared column)
+        # so it can grow taller (e.g. when the workout chart appears) without ever pushing
+        # Pause/Finish out of reach - see _build_controls_panel's docstring note.
         panel = Gtk.Frame()
         panel.add_css_class("ride-panel-card")
+        panel.set_valign(Gtk.Align.START)
+        panel.set_halign(Gtk.Align.START)
+        panel.set_margin_top(_DRAG_BAR_HEIGHT + 12)
+        panel.set_margin_start(12)
+        panel.set_size_request(_STATS_PANEL_WIDTH, -1)
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.set_margin_top(8)
-        box.set_margin_bottom(8)
-        box.set_margin_start(10)
-        box.set_margin_end(10)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        box.set_margin_top(6)
+        box.set_margin_bottom(6)
+        box.set_margin_start(8)
+        box.set_margin_end(8)
 
-        self._progress_bar = Gtk.ProgressBar(hexpand=True)
-        box.append(self._progress_bar)
-
+        # Doubles as the ride's progress indicator via its own marker line - a separate
+        # Gtk.ProgressBar next to it would just be showing the same position twice.
         self._elevation_chart = ElevationProfileChart()
         self._elevation_chart.set_hexpand(True)
-        self._elevation_chart.set_margin_top(4)
         box.append(self._elevation_chart)
 
         self._stat_labels: dict[str, Gtk.Label] = {}
@@ -155,24 +145,29 @@ class RideView(Gtk.Overlay):
             ["grade", "erg_target"],
         ]
         for row_keys in rows:
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
             for key in row_keys:
                 label = Gtk.Label(label="--")
-                label.set_width_chars(12)
+                label.set_width_chars(9)
                 self._stat_labels[key] = label
                 row.append(label)
             box.append(row)
 
         self._workout_chart = WorkoutProfileChart()
         self._workout_chart.set_visible(False)
-        self._workout_chart.set_margin_top(4)
+        self._workout_chart.set_margin_top(2)
+        self._workout_chart.set_size_request(-1, 28)  # shorter here than in Workouts/Creator - this
+        # is a glanceable ride-screen readout, not something you're editing block-by-block
         box.append(self._workout_chart)
 
-        self._status_label = Gtk.Label(xalign=0.0)
+        # Unwrapped, this label's own natural width (long messages like "Trainer not connected -
+        # pair it first to track distance.") would drag the whole panel wider than intended,
+        # leaving the compact stat rows above looking sparse against all that extra space.
+        self._status_label = Gtk.Label(xalign=0.0, wrap=True, max_width_chars=24)
         box.append(self._status_label)
 
         panel.set_child(box)
-        return panel
+        self.add_overlay(panel)
 
     def _build_map_controls_panel(self) -> None:
         panel = Gtk.Frame()
@@ -217,9 +212,17 @@ class RideView(Gtk.Overlay):
         self._tilt_degrees = scale.get_value()
         self.map_view.reset_manual_override()
 
-    def _build_controls_panel(self) -> Gtk.Widget:
+    def _build_controls_panel(self) -> None:
+        # Pinned to the bottom-left independently of the stats panel above (not stacked
+        # directly under it) - frees up the middle of the map, and means Pause/Finish stay
+        # reachable no matter how tall the stats panel gets (e.g. once the workout chart
+        # appears), instead of both being glued into one fixed-width column.
         panel = Gtk.Frame()
         panel.add_css_class("ride-panel-card")
+        panel.set_valign(Gtk.Align.END)
+        panel.set_halign(Gtk.Align.START)
+        panel.set_margin_start(12)
+        panel.set_margin_bottom(12)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer.set_margin_top(4)
@@ -243,7 +246,7 @@ class RideView(Gtk.Overlay):
         outer.append(self._button_box)
 
         panel.set_child(outer)
-        return panel
+        self.add_overlay(panel)
 
     def load_route(self, route_id: str) -> None:
         if self._route is not None and self._route.id == route_id:
@@ -294,7 +297,6 @@ class RideView(Gtk.Overlay):
         return True  # keep repeating
 
     def _on_stats_changed(self, stats: RideStats) -> None:
-        self._progress_bar.set_fraction(stats.progress_fraction)
         self._elevation_chart.set_progress_meters(stats.distance_meters)
         self._stat_labels["distance"].set_text(f"Distance\n{units.format_miles(stats.distance_meters)}")
         self._stat_labels["time"].set_text(f"Time\n{units.format_duration(stats.elapsed_seconds)}")
@@ -353,10 +355,13 @@ class RideView(Gtk.Overlay):
         if route is None or engine is None:
             return
         gpx_text = gpx_writer.write(route.name, engine.track_points_snapshot())
-        self.app.history_repository.save_ride(route.name, stats, gpx_text)
+        # Saved to history immediately (title = route name by default), same as Android's
+        # RideSummaryViewModel - the summary screen lets the rider rename/annotate it afterward
+        # rather than gating the save on that.
+        record = self.app.history_repository.save_ride(route.name, stats, gpx_text)
         self._route = None
         self._engine = None
-        self.window.show_history()
+        self.window.show_ride_summary(record)
 
     def _open_workout_picker(self) -> None:
         dialog = Adw.Dialog(title="Choose Workout", content_width=360, content_height=420)

@@ -33,7 +33,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -162,40 +161,41 @@ fun RideScreen(
                 .height(120.dp)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent),
+                        listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent),
                     ),
                 ),
         )
 
         if (isLandscape) {
-            // Stack stats + pause/finish together on the left so the entire right side stays
-            // free for MapControls, instead of splitting left/right and cramping both.
-            Column(
+            // Stats and Pause/Finish are pinned independently (not stacked in one Column) so
+            // the stats card can grow taller - e.g. once the workout chart appears - without
+            // ever pushing the Finish button below a short landscape viewport. Both sit in the
+            // same narrow left strip, keeping the rest of the map free for MapControls.
+            StatsCard(
+                stats = stats,
+                currentRoute = currentRoute,
+                selectedWorkout = selectedWorkout,
+                gradeControlState = gradeControlState,
+                trainerConnected = trainerConnected,
+                isLandscape = isLandscape,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
                     .padding(12.dp)
                     .fillMaxWidth(0.25f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                StatsCard(
-                    stats = stats,
-                    currentRoute = currentRoute,
-                    selectedWorkout = selectedWorkout,
-                    gradeControlState = gradeControlState,
-                    trainerConnected = trainerConnected,
-                    isLandscape = isLandscape,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                ActionCard(
-                    stats = stats,
-                    selectedWorkout = selectedWorkout,
-                    isLandscape = isLandscape,
-                    viewModel = viewModel,
-                    onChooseWorkout = { showWorkoutPicker = true },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            )
+            ActionCard(
+                stats = stats,
+                selectedWorkout = selectedWorkout,
+                isLandscape = isLandscape,
+                viewModel = viewModel,
+                onChooseWorkout = { showWorkoutPicker = true },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding()
+                    .padding(12.dp)
+                    .fillMaxWidth(0.25f),
+            )
         } else {
             StatsCard(
                 stats = stats,
@@ -259,15 +259,13 @@ private fun StatsCard(
         shadowElevation = 4.dp,
     ) {
         Column(modifier = Modifier.padding(10.dp).verticalScroll(rememberScrollState())) {
-            LinearProgressIndicator(
-                progress = { stats.progressFraction.toFloat() },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // Doubles as the ride's progress indicator via its own marker line - a separate
+            // LinearProgressIndicator above it would just be showing the same position twice.
             currentRoute?.let { route ->
                 ElevationProfileChart(
                     route = route,
                     progressMeters = stats.distanceMeters,
-                    modifier = Modifier.fillMaxWidth().height(20.dp).padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().height(20.dp),
                 )
             }
             Row(

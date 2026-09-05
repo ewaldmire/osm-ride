@@ -45,3 +45,8 @@ class RouteSummary:
     # Non-None only for routes built in-app with the route creator; used to reopen them for
     # editing.
     waypoints: list[RouteWaypoint] | None = None
+    # A small cached MapLibre snapshot (PNG, in the same routes dir), generated once at
+    # import/edit time rather than redrawn on every list render. None until generation finishes
+    # (or for routes imported before this field existed) - the list falls back to a placeholder
+    # icon until the next edit regenerates it.
+    thumbnail_file_name: str | None = None

@@ -15,7 +15,12 @@ from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 from ..route.models import RouteSummary  # noqa: E402
 from ..route.repository import RouteRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
+from . import route_thumbnail_generator  # noqa: E402
+from .route_thumbnail_image import RouteThumbnailImage  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
+
+_THUMBNAIL_DISPLAY_WIDTH = 64
+_THUMBNAIL_DISPLAY_HEIGHT = 40
 
 
 class RoutesView(ToolbarPage):
@@ -24,7 +29,7 @@ class RoutesView(ToolbarPage):
         self.window = window
         self._repo = window.app.route_repository
 
-        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Routes"))
+        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="New Ride"))
         create_button = Gtk.Button(label="Create Route…")
         create_button.connect("clicked", lambda _b: window.show_route_creator_new())
         import_button = Gtk.Button(label="Import GPX…")
@@ -69,6 +74,19 @@ class RoutesView(ToolbarPage):
         for row in self._route_rows:
             self._routes_group.add(row)
 
+    def _build_thumbnail_widget(self, thumb_path: Path | None) -> Gtk.Widget:
+        if thumb_path is not None and thumb_path.exists():
+            thumbnail = RouteThumbnailImage(thumb_path, _THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT)
+            thumbnail.add_css_class("card")
+            return thumbnail
+        # No cached snapshot yet (not generated, still generating, or this route predates the
+        # feature) - a plain icon placeholder rather than leaving a gap.
+        placeholder = Gtk.Image(icon_name="mark-location-symbolic", pixel_size=24)
+        placeholder.add_css_class("dim-label")
+        placeholder.add_css_class("card")
+        placeholder.set_size_request(_THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT)
+        return placeholder
+
     def _build_row(self, summary: RouteSummary) -> Adw.ActionRow:
         row = Adw.ActionRow(
             title=summary.name,
@@ -77,6 +95,10 @@ class RoutesView(ToolbarPage):
             activatable=True,
         )
         row.connect("activated", lambda _r, s=summary: self._select(s))
+
+        thumb_path = self._repo.thumbnail_path(summary)
+        thumbnail = self._build_thumbnail_widget(thumb_path)
+        row.add_prefix(thumbnail)
 
         # Only routes built in-app carry a waypoint list to re-route from - plain GPX imports
         # have nothing for the creator to reopen.
@@ -144,9 +166,24 @@ class RoutesView(ToolbarPage):
             return  # cancelled
         path = Path(file.get_path())
         try:
-            self._repo.import_gpx(path, path.stem)
+            summary = self._repo.import_gpx(path, path.stem)
         except RouteRepositoryError as e:
             self._show_error(str(e))
+            return
+        self._generate_thumbnail(summary)
+
+    def _generate_thumbnail(self, summary: RouteSummary) -> None:
+        route = self._repo.load_route(summary.id)
+        if route is None:
+            return
+        thumbnail_file_name = f"{summary.id}_thumb.png"
+        destination = self._repo.directory / thumbnail_file_name
+
+        def on_done(success: bool) -> None:
+            if success:
+                self._repo.set_thumbnail(summary.id, thumbnail_file_name)
+
+        route_thumbnail_generator.generate(route, destination, on_done)
 
     def _show_error(self, message: str) -> None:
         dialog = Adw.AlertDialog.new("Import Failed", message)
