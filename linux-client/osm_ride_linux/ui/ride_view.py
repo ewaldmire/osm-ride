@@ -26,6 +26,7 @@ from ..ride.engine import RideEngine  # noqa: E402
 from ..ride.models import RideState, RideStats, Workout  # noqa: E402
 from ..route.models import Route  # noqa: E402
 from ..util import units  # noqa: E402
+from .elevation_profile_chart import ElevationProfileChart  # noqa: E402
 from .ride_map_view import RideMapView  # noqa: E402
 from .workout_profile_chart import WorkoutProfileChart  # noqa: E402
 
@@ -92,6 +93,14 @@ class RideView(Gtk.Overlay):
         box.set_margin_bottom(8)
         box.set_margin_start(10)
         box.set_margin_end(10)
+
+        self._progress_bar = Gtk.ProgressBar(hexpand=True)
+        box.append(self._progress_bar)
+
+        self._elevation_chart = ElevationProfileChart()
+        self._elevation_chart.set_hexpand(True)
+        self._elevation_chart.set_margin_top(4)
+        box.append(self._elevation_chart)
 
         self._stat_labels: dict[str, Gtk.Label] = {}
         rows = [
@@ -216,6 +225,7 @@ class RideView(Gtk.Overlay):
         self._set_workout(None)
 
         self.map_view.set_route(route)
+        self._elevation_chart.set_route(route)
 
         self.app.trainer_client.on_sample = self._on_trainer_sample
         self.app.heart_rate_client.on_sample = self._on_heart_rate_sample
@@ -248,6 +258,8 @@ class RideView(Gtk.Overlay):
         return True  # keep repeating
 
     def _on_stats_changed(self, stats: RideStats) -> None:
+        self._progress_bar.set_fraction(stats.progress_fraction)
+        self._elevation_chart.set_progress_meters(stats.distance_meters)
         self._stat_labels["distance"].set_text(f"Distance\n{units.format_miles(stats.distance_meters)}")
         self._stat_labels["time"].set_text(f"Time\n{units.format_duration(stats.elapsed_seconds)}")
         self._stat_labels["speed"].set_text(f"Speed\n{units.format_mph(stats.current_speed_mps)}")
