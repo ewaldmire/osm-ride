@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.RideEngine
@@ -220,58 +220,61 @@ private fun RouteCard(
     }
 
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Full card width rather than a small leading box in a Row - a 5:3 box that wide
-            // would leave too little room for the title/stats column on a phone-width screen
-            // (confirmed via a real screenshot: route names wrapped one word - even one
-            // character - per line). Fixed height, ContentScale.Crop handles whatever aspect
-            // ratio the resulting width implies.
-            Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    // No cached snapshot yet (not generated, still generating, or this route
-                    // predates the feature) - a plain icon placeholder rather than a gap.
-                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
-                        Icon(
-                            Icons.Filled.Place,
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Same 5:3 aspect ratio as the generated PNG (see RouteThumbnailGenerator's
+                // THUMBNAIL_WIDTH/THUMBNAIL_HEIGHT) and ContentScale.Fit (not Crop) - shows the
+                // whole route, not just whatever the camera's exact-fit bounds happen to leave
+                // near the edges cropped off.
+                Box(modifier = Modifier.size(width = 160.dp, height = 96.dp)) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap,
                             contentDescription = null,
-                            modifier = Modifier.align(Alignment.Center).size(32.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
                         )
+                    } else {
+                        // No cached snapshot yet (not generated, still generating, or this route
+                        // predates the feature) - a plain icon placeholder rather than a gap.
+                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+                            Icon(
+                                Icons.Filled.Place,
+                                contentDescription = null,
+                                modifier = Modifier.align(Alignment.Center).size(32.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(route.name, style = MaterialTheme.typography.titleMedium)
+                // Only the title/stats sit next to the thumbnail - the action icons get their own
+                // row below instead of also competing for this same width, which is what caused
+                // route names to wrap one word (even one character) per line on phone screens.
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(
+                        route.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         "${Units.formatMiles(route.totalDistanceMeters)} · " +
                             "${Units.formatFeet(route.elevationGainMeters)} climb",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-                Row {
-                    if (route.waypoints != null) {
-                        IconButton(onClick = onEditRoute) {
-                            Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
-                        }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                if (route.waypoints != null) {
+                    IconButton(onClick = onEditRoute) {
+                        Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
                     }
-                    IconButton(onClick = onRename) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Rename route")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete route")
-                    }
+                }
+                IconButton(onClick = onRename) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Rename route")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete route")
                 }
             }
         }
