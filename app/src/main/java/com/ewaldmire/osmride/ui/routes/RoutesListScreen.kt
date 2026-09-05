@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -98,21 +97,17 @@ fun RoutesListScreen(
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    // Top bar, not a floating action button - a bottom FAB stack covered the
+                    // edit/delete icons on whatever route card happened to be last in the list.
+                    IconButton(onClick = onCreateRoute) {
+                        Icon(Icons.Filled.AddRoad, contentDescription = "Create route")
+                    }
+                    IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                        Icon(Icons.Filled.UploadFile, contentDescription = "Import GPX")
+                    }
+                },
             )
-        },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ExtendedFloatingActionButton(
-                    onClick = onCreateRoute,
-                    icon = { Icon(Icons.Filled.AddRoad, contentDescription = null) },
-                    text = { Text("Create") },
-                )
-                ExtendedFloatingActionButton(
-                    onClick = { importLauncher.launch(arrayOf("*/*")) },
-                    icon = { Icon(Icons.Filled.UploadFile, contentDescription = null) },
-                    text = { Text("Import") },
-                )
-            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
     ) { padding ->
@@ -183,7 +178,7 @@ private fun EmptyState(padding: PaddingValues) {
     ) {
         Icon(Icons.Filled.DirectionsBike, contentDescription = null)
         Text(
-            "No routes yet. Tap + to import a GPX route file.",
+            "No routes yet. Use the buttons above to create or import one.",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(top = 12.dp),
         )
