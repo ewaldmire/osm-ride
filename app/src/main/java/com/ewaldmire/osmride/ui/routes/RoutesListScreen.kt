@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddRoad
 import androidx.compose.material.icons.filled.ArrowBack
@@ -54,7 +54,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -221,17 +220,13 @@ private fun RouteCard(
     }
 
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Same 5:3 aspect ratio as the generated PNG (see RouteThumbnailGenerator's
-            // THUMBNAIL_WIDTH/THUMBNAIL_HEIGHT) so the display scale is uniform, not stretched.
-            Box(
-                modifier = Modifier.size(width = 160.dp, height = 96.dp).clip(RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Full card width rather than a small leading box in a Row - a 5:3 box that wide
+            // would leave too little room for the title/stats column on a phone-width screen
+            // (confirmed via a real screenshot: route names wrapped one word - even one
+            // character - per line). Fixed height, ContentScale.Crop handles whatever aspect
+            // ratio the resulting width implies.
+            Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap,
@@ -252,25 +247,31 @@ private fun RouteCard(
                     }
                 }
             }
-            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(route.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${Units.formatMiles(route.totalDistanceMeters)} · " +
-                        "${Units.formatFeet(route.elevationGainMeters)} climb",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Row {
-                if (route.waypoints != null) {
-                    IconButton(onClick = onEditRoute) {
-                        Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(route.name, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${Units.formatMiles(route.totalDistanceMeters)} · " +
+                            "${Units.formatFeet(route.elevationGainMeters)} climb",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Row {
+                    if (route.waypoints != null) {
+                        IconButton(onClick = onEditRoute) {
+                            Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
+                        }
                     }
-                }
-                IconButton(onClick = onRename) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Rename route")
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete route")
+                    IconButton(onClick = onRename) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Rename route")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete route")
+                    }
                 }
             }
         }
