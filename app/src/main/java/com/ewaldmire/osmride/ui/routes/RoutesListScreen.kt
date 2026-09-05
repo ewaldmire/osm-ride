@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -220,37 +221,41 @@ private fun RouteCard(
     }
 
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Same 5:3 aspect ratio as the generated PNG (see RouteThumbnailGenerator's
-                // THUMBNAIL_WIDTH/THUMBNAIL_HEIGHT) and ContentScale.Fit (not Crop) - shows the
-                // whole route, not just whatever the camera's exact-fit bounds happen to leave
-                // near the edges cropped off.
-                Box(modifier = Modifier.size(width = 160.dp, height = 96.dp)) {
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap,
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            // Same 5:3 aspect ratio as the generated PNG (see RouteThumbnailGenerator's
+            // THUMBNAIL_WIDTH/THUMBNAIL_HEIGHT) and ContentScale.Fit (not Crop) - shows the
+            // whole route, not just whatever the camera's exact-fit bounds happen to leave near
+            // the edges cropped off.
+            Box(modifier = Modifier.size(width = 160.dp, height = 96.dp)) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    // No cached snapshot yet (not generated, still generating, or this route
+                    // predates the feature) - a plain icon placeholder rather than a gap.
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        Icon(
+                            Icons.Filled.Place,
                             contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.align(Alignment.Center).size(32.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    } else {
-                        // No cached snapshot yet (not generated, still generating, or this route
-                        // predates the feature) - a plain icon placeholder rather than a gap.
-                        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
-                            Icon(
-                                Icons.Filled.Place,
-                                contentDescription = null,
-                                modifier = Modifier.align(Alignment.Center).size(32.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                     }
                 }
-                // Only the title/stats sit next to the thumbnail - the action icons get their own
-                // row below instead of also competing for this same width, which is what caused
-                // route names to wrap one word (even one character) per line on phone screens.
-                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+            }
+            // Matches the thumbnail's own height (Row sizes to its tallest child) with the
+            // action icons pinned to the bottom via SpaceBetween, instead of a separate full-width
+            // row below - avoids the wasted whitespace of a 96dp-tall thumbnail sitting next to a
+            // much shorter text block.
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column {
                     Text(
                         route.name,
                         style = MaterialTheme.typography.titleMedium,
@@ -263,18 +268,18 @@ private fun RouteCard(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                if (route.waypoints != null) {
-                    IconButton(onClick = onEditRoute) {
-                        Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (route.waypoints != null) {
+                        IconButton(onClick = onEditRoute) {
+                            Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
+                        }
                     }
-                }
-                IconButton(onClick = onRename) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Rename route")
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete route")
+                    IconButton(onClick = onRename) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Rename route")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete route")
+                    }
                 }
             }
         }
