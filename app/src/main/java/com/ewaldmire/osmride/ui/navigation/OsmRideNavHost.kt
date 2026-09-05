@@ -62,7 +62,9 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                 RoutesListScreen(
                     onRouteSelected = { routeId -> navController.navigate(Destinations.ride(routeId)) },
                     onCreateRoute = { navController.navigate(Destinations.ROUTE_CREATOR_NEW) },
-                    onEditRoute = { routeId -> navController.navigate(Destinations.routeCreatorEdit(routeId)) },
+                    onEditRoute = { routeId, showDerivedHint ->
+                        navController.navigate(Destinations.routeCreatorEdit(routeId, showDerivedHint))
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -74,10 +76,15 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                         nullable = true
                         defaultValue = null
                     },
+                    navArgument("showDerivedHint") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
                 ),
             ) { backStackEntry ->
                 RouteCreatorScreen(
                     routeId = backStackEntry.arguments?.getString("routeId"),
+                    showDerivedHint = backStackEntry.arguments?.getBoolean("showDerivedHint") ?: false,
                     onBack = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
                 )

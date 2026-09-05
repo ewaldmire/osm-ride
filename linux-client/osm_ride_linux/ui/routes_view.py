@@ -12,6 +12,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
+from ..route import waypoint_simplifier  # noqa: E402
 from ..route.models import RouteSummary  # noqa: E402
 from ..route.repository import RouteRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
@@ -102,9 +103,9 @@ class RoutesView(ToolbarPage):
         thumbnail = self._build_thumbnail_widget(thumb_path)
         row.add_prefix(thumbnail)
 
-        # One edit action, not two: routes built in-app (have waypoints) open the full route
-        # creator - which already has its own name field - while plain GPX imports (no waypoints
-        # to redraw) fall back to a rename-only dialog.
+        # Every route opens the full route creator to edit - which already has its own name
+        # field, covering renaming too. Plain GPX imports get a sparse waypoint list derived
+        # from their track the first time they're opened this way (see _edit()).
         edit_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
         edit_button.set_tooltip_text("Edit Route")
         edit_button.add_css_class("flat")
@@ -123,30 +124,16 @@ class RoutesView(ToolbarPage):
         self.window.show_ride(summary.id)
 
     def _edit(self, summary: RouteSummary) -> None:
-        if summary.waypoints is not None:
-            self.window.show_route_creator_edit(summary.id)
-        else:
-            self._rename(summary)
-
-    def _rename(self, summary: RouteSummary) -> None:
-        dialog = Adw.AlertDialog.new("Rename Route", None)
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("save", "Save")
-        dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("save")
-        dialog.set_close_response("cancel")
-
-        entry = Gtk.Entry()
-        entry.set_text(summary.name)
-        dialog.set_extra_child(entry)
-
-        def on_response(_dialog: Adw.AlertDialog, response: str) -> None:
-            if response == "save":
-                new_name = entry.get_text().strip() or summary.name
-                self._repo.rename_route(summary.id, new_name)
-
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
+        # Lazy backfill, not done at import time: most imports may never be edited, so only pay
+        # for deriving a waypoint list the first time a route is actually opened this way.
+        derived_now = False
+        if summary.waypoints is None:
+            route = self._repo.load_route(summary.id)
+            if route is not None and len(route.points) >= 2:
+                waypoints = waypoint_simplifier.derive_waypoints(route.points)
+                self._repo.set_waypoints(summary.id, waypoints)
+                derived_now = True
+        self.window.show_route_creator_edit(summary.id, show_derived_hint=derived_now)
 
     def _delete(self, summary: RouteSummary) -> None:
         self._repo.delete_route(summary.id)

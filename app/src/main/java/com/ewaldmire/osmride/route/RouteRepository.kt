@@ -127,13 +127,6 @@ class RouteRepository(context: Context) {
 
     fun getRouteSummary(id: String): RouteSummary? = _routes.value.find { it.id == id }
 
-    suspend fun renameRoute(id: String, name: String) = withContext(Dispatchers.IO) {
-        val resolved = name.ifBlank { return@withContext }
-        val updated = _routes.value.map { if (it.id == id) it.copy(name = resolved) else it }
-        _routes.value = updated
-        saveIndex(updated)
-    }
-
     /** Called once a RouteThumbnailGenerator snapshot finishes - never blocks import/save,
      * since generation happens asynchronously afterward. */
     suspend fun setThumbnail(id: String, thumbnailFileName: String) = withContext(Dispatchers.IO) {
@@ -144,6 +137,14 @@ class RouteRepository(context: Context) {
 
     fun thumbnailFile(summary: RouteSummary): File? =
         summary.thumbnailFileName?.let { File(routesDir, it) }
+
+    /** Backfills a derived waypoint list onto an imported route the first time it's opened for
+     * editing - lazy, not done at import time, so most imports never pay this cost. */
+    suspend fun setWaypoints(id: String, waypoints: List<RouteWaypoint>) = withContext(Dispatchers.IO) {
+        val updated = _routes.value.map { if (it.id == id) it.copy(waypoints = waypoints) else it }
+        _routes.value = updated
+        saveIndex(updated)
+    }
 
     /** Where a newly-generated thumbnail file should be written - see RouteThumbnailGenerator. */
     val directory: File get() = routesDir

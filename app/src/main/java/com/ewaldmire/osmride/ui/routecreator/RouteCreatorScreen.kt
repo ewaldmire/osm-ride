@@ -40,6 +40,7 @@ fun RouteCreatorScreen(
     routeId: String?,
     onBack: () -> Unit,
     onSaved: (String) -> Unit,
+    showDerivedHint: Boolean = false,
     viewModel: RouteCreatorViewModel = viewModel(),
 ) {
     val name by viewModel.name.collectAsState()
@@ -48,10 +49,11 @@ fun RouteCreatorScreen(
     val isRouting by viewModel.isRouting.collectAsState()
     val error by viewModel.error.collectAsState()
     val saved by viewModel.saved.collectAsState()
+    val hint by viewModel.hint.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(routeId) {
-        if (routeId != null) viewModel.loadForEdit(routeId)
+        if (routeId != null) viewModel.loadForEdit(routeId, showDerivedHint)
     }
 
     LaunchedEffect(saved) {
@@ -62,6 +64,13 @@ fun RouteCreatorScreen(
         error?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(hint) {
+        hint?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearHint()
         }
     }
 

@@ -109,8 +109,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.route_creator_view.start_new()
         self.stack.set_visible_child_name("route_creator")
 
-    def show_route_creator_edit(self, route_id: str) -> None:
-        self.route_creator_view.start_edit(route_id)
+    def show_route_creator_edit(self, route_id: str, show_derived_hint: bool = False) -> None:
+        self.route_creator_view.start_edit(route_id, show_derived_hint=show_derived_hint)
         self.stack.set_visible_child_name("route_creator")
 
     def show_workout_creator_new(self) -> None:

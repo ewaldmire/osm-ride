@@ -49,7 +49,10 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
     private val _saved = MutableStateFlow<String?>(null)
     val saved: StateFlow<String?> = _saved.asStateFlow()
 
-    fun loadForEdit(routeId: String) {
+    private val _hint = MutableStateFlow<String?>(null)
+    val hint: StateFlow<String?> = _hint.asStateFlow()
+
+    fun loadForEdit(routeId: String, showDerivedHint: Boolean = false) {
         if (existingId == routeId) return
         existingId = routeId
         val summary = routeRepository.getRouteSummary(routeId) ?: return
@@ -57,6 +60,13 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
         val loadedWaypoints = summary.waypoints ?: emptyList()
         _waypoints.value = loadedWaypoints
         if (loadedWaypoints.size >= 2) routeCurrentWaypoints()
+        if (showDerivedHint) {
+            _hint.value = "Editing may adjust this route slightly to follow roads."
+        }
+    }
+
+    fun clearHint() {
+        _hint.value = null
     }
 
     fun updateName(newName: String) {

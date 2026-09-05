@@ -78,7 +78,10 @@ class RouteCreatorView(ToolbarPage):
         content.append(hint)
         content.append(self.map_view)
         content.append(self._summary_label)
-        self.set_content(content)
+
+        self._toast_overlay = Adw.ToastOverlay()
+        self._toast_overlay.set_child(content)
+        self.set_content(self._toast_overlay)
 
     def start_new(self) -> None:
         self._existing_id = None
@@ -87,7 +90,7 @@ class RouteCreatorView(ToolbarPage):
         self._clear_preview()
         self.map_view.set_waypoints([])
 
-    def start_edit(self, route_id: str) -> None:
+    def start_edit(self, route_id: str, show_derived_hint: bool = False) -> None:
         summary = self._repo.get_route_summary(route_id)
         if summary is None or summary.waypoints is None:
             return  # not a route this editor can open - no waypoint list to work from
@@ -98,6 +101,10 @@ class RouteCreatorView(ToolbarPage):
         self.map_view.set_waypoints(self._waypoints)
         if len(self._waypoints) >= 2:
             self._route_current_waypoints()
+        if show_derived_hint:
+            toast = Adw.Toast.new("Editing may adjust this route slightly to follow roads.")
+            toast.set_timeout(5)
+            self._toast_overlay.add_toast(toast)
 
     def _on_map_tapped(self, lon: float, lat: float) -> bool:
         self._waypoints.append(RouteWaypoint(lat=lat, lon=lon))

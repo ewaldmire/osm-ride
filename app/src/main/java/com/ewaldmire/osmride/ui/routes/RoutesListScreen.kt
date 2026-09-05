@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,22 +34,17 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -70,7 +64,7 @@ import kotlinx.coroutines.launch
 fun RoutesListScreen(
     onRouteSelected: (String) -> Unit,
     onCreateRoute: () -> Unit,
-    onEditRoute: (String) -> Unit,
+    onEditRoute: (routeId: String, showDerivedHint: Boolean) -> Unit,
     onBack: () -> Unit,
     viewModel: RoutesListViewModel = viewModel(),
 ) {
@@ -80,7 +74,6 @@ fun RoutesListScreen(
     val activeRideEngine by viewModel.activeRideEngine.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var renamingRoute by remember { mutableStateOf<RouteSummary?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
@@ -93,17 +86,6 @@ fun RoutesListScreen(
             snackbarHostState.showSnackbar(it)
             viewModel.clearImportError()
         }
-    }
-
-    renamingRoute?.let { route ->
-        RenameRouteDialog(
-            route = route,
-            onSave = { newName ->
-                viewModel.renameRoute(route.id, newName)
-                renamingRoute = null
-            },
-            onDismiss = { renamingRoute = null },
-        )
     }
 
     Scaffold(
@@ -162,8 +144,11 @@ fun RoutesListScreen(
                         route = route,
                         thumbnailFile = viewModel.thumbnailFile(route),
                         onClick = { selectRoute(route.id) },
-                        onRename = { renamingRoute = route },
-                        onEditRoute = { onEditRoute(route.id) },
+                        onEdit = {
+                            viewModel.prepareEdit(route.id) { showDerivedHint ->
+                                onEditRoute(route.id, showDerivedHint)
+                            }
+                        },
                         onDelete = { viewModel.deleteRoute(route.id) },
                     )
                 }
@@ -209,8 +194,7 @@ private fun RouteCard(
     route: RouteSummary,
     thumbnailFile: File?,
     onClick: () -> Unit,
-    onRename: () -> Unit,
-    onEditRoute: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     // Cheap to decode on every recomposition at this size (a small cached PNG, not the full map)
@@ -268,10 +252,11 @@ private fun RouteCard(
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    // One edit action, not two: routes built in-app (have waypoints) open the
-                    // full route creator - which already has its own name field - while plain
-                    // GPX imports (no waypoints to redraw) fall back to a rename-only dialog.
-                    IconButton(onClick = { if (route.waypoints != null) onEditRoute() else onRename() }) {
+                    // Every route opens the full route creator to edit - which already has its
+                    // own name field, covering renaming too. Plain GPX imports get a sparse
+                    // waypoint list derived from their track the first time they're opened this
+                    // way (see RoutesListViewModel.prepareEdit).
+                    IconButton(onClick = onEdit) {
                         Icon(Icons.Filled.Edit, contentDescription = "Edit route")
                     }
                     IconButton(onClick = onDelete) {
@@ -281,31 +266,6 @@ private fun RouteCard(
             }
         }
     }
-}
-
-@Composable
-private fun RenameRouteDialog(route: RouteSummary, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember(route.id) { mutableStateOf(route.name) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rename Route") },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Route name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(name.ifBlank { route.name }) }) { Text("Save") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
 }
 
 private fun queryDisplayName(uri: Uri, context: android.content.Context): String? {

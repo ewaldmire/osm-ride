@@ -102,6 +102,12 @@ class RouteRepository:
             return None
         return self._routes_dir / summary.thumbnail_file_name
 
+    def set_waypoints(self, route_id: str, waypoints: list[RouteWaypoint]) -> None:
+        """Backfills a derived waypoint list onto an imported route the first time it's opened
+        for editing - lazy, not done at import time, so most imports never pay this cost."""
+        updated = [replace(r, waypoints=waypoints) if r.id == route_id else r for r in self.routes]
+        self._update_routes(updated)
+
     @property
     def directory(self) -> Path:
         return self._routes_dir

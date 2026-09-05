@@ -8,6 +8,7 @@ import com.ewaldmire.osmride.OsmRideApp
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.route.RouteSummary
 import com.ewaldmire.osmride.route.RouteThumbnailGenerator
+import com.ewaldmire.osmride.route.WaypointSimplifier
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,8 +55,26 @@ class RoutesListViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch { repository.deleteRoute(id) }
     }
 
-    fun renameRoute(id: String, name: String) {
-        viewModelScope.launch { repository.renameRoute(id, name) }
+    /**
+     * Ensures [routeId] has a real waypoint list before opening the route creator - lazily
+     * derives one from the route's dense track if it's a plain GPX import that's never been
+     * opened for editing before (see WaypointSimplifier), then persists it so this only runs
+     * once per route. Calls [onReady] with whether a derivation just happened, so the caller can
+     * show a one-time "this may adjust the route" notice.
+     */
+    fun prepareEdit(routeId: String, onReady: (showDerivedHint: Boolean) -> Unit) {
+        viewModelScope.launch {
+            val summary = repository.getRouteSummary(routeId)
+            var derivedNow = false
+            if (summary != null && summary.waypoints == null) {
+                val route = repository.loadRoute(routeId)
+                if (route != null && route.points.size >= 2) {
+                    repository.setWaypoints(routeId, WaypointSimplifier.deriveWaypoints(route.points))
+                    derivedNow = true
+                }
+            }
+            onReady(derivedNow)
+        }
     }
 
     fun thumbnailFile(summary: RouteSummary): File? = repository.thumbnailFile(summary)
