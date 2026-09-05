@@ -3,11 +3,13 @@ singletons, mirroring the role OsmRideApp.kt plays for the Android app."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw  # noqa: E402
+from gi.repository import Adw, Gdk, Gtk  # noqa: E402
 
 from ..ble.heart_rate_client import HeartRateClient
 from ..ble.trainer_client import TrainerClient
@@ -33,6 +35,12 @@ class OsmRideApplication(Adw.Application):
 
     def do_activate(self) -> None:
         if self._window is None:
+            # Bundled custom icons (bike, dumbbell) - stock GTK/Adwaita has no icon for either.
+            # Registered here (once a display connection exists) rather than a Flatpak manifest
+            # install step, so the same source tree works both as the built app and via the
+            # bare-runtime dev workflow in README.md's "Development environment" section.
+            icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+            icon_theme.add_search_path(str(Path(__file__).parent / "icons"))
             self._window = MainWindow(self)
         self._window.present()
 

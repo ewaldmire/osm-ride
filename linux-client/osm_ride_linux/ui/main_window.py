@@ -43,10 +43,10 @@ class MainWindow(Adw.ApplicationWindow):
         # "Ride" (not "Routes") - this tab is the primary way to start riding, not a separate
         # browsing library; it's the same route list/create/import screen, just reframed as an
         # action, matching Android's OsmRideBottomBar.kt.
-        self.stack.add_titled_with_icon(self.routes_view, "routes", "Ride", "mark-location-symbolic")
+        self.stack.add_titled_with_icon(self.routes_view, "routes", "Ride", "osm-ride-bike-symbolic")
 
         self.workouts_view = WorkoutsView(self)
-        self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workouts", "system-run-symbolic")
+        self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workouts", "osm-ride-dumbbell-symbolic")
 
         self.settings_view = SettingsView(self)
         self.stack.add_titled_with_icon(self.settings_view, "settings", "Settings", "preferences-system-symbolic")
