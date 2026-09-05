@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
@@ -269,13 +268,11 @@ private fun RouteCard(
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    if (route.waypoints != null) {
-                        IconButton(onClick = onEditRoute) {
-                            Icon(Icons.Filled.EditLocationAlt, contentDescription = "Edit route path")
-                        }
-                    }
-                    IconButton(onClick = onRename) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Rename route")
+                    // One edit action, not two: routes built in-app (have waypoints) open the
+                    // full route creator - which already has its own name field - while plain
+                    // GPX imports (no waypoints to redraw) fall back to a rename-only dialog.
+                    IconButton(onClick = { if (route.waypoints != null) onEditRoute() else onRename() }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit route")
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete route")

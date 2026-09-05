@@ -102,20 +102,14 @@ class RoutesView(ToolbarPage):
         thumbnail = self._build_thumbnail_widget(thumb_path)
         row.add_prefix(thumbnail)
 
-        # Only routes built in-app carry a waypoint list to re-route from - plain GPX imports
-        # have nothing for the creator to reopen.
-        if summary.waypoints is not None:
-            edit_button = Gtk.Button(icon_name="view-pin-symbolic", valign=Gtk.Align.CENTER)
-            edit_button.set_tooltip_text("Edit Route")
-            edit_button.add_css_class("flat")
-            edit_button.connect("clicked", lambda _b, s=summary: self.window.show_route_creator_edit(s.id))
-            row.add_suffix(edit_button)
-
-        rename_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
-        rename_button.set_tooltip_text("Rename")
-        rename_button.add_css_class("flat")
-        rename_button.connect("clicked", lambda _b, s=summary: self._rename(s))
-        row.add_suffix(rename_button)
+        # One edit action, not two: routes built in-app (have waypoints) open the full route
+        # creator - which already has its own name field - while plain GPX imports (no waypoints
+        # to redraw) fall back to a rename-only dialog.
+        edit_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
+        edit_button.set_tooltip_text("Edit Route")
+        edit_button.add_css_class("flat")
+        edit_button.connect("clicked", lambda _b, s=summary: self._edit(s))
+        row.add_suffix(edit_button)
 
         delete_button = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
         delete_button.set_tooltip_text("Delete")
@@ -127,6 +121,12 @@ class RoutesView(ToolbarPage):
 
     def _select(self, summary: RouteSummary) -> None:
         self.window.show_ride(summary.id)
+
+    def _edit(self, summary: RouteSummary) -> None:
+        if summary.waypoints is not None:
+            self.window.show_route_creator_edit(summary.id)
+        else:
+            self._rename(summary)
 
     def _rename(self, summary: RouteSummary) -> None:
         dialog = Adw.AlertDialog.new("Rename Route", None)
