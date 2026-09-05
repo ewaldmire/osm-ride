@@ -40,13 +40,15 @@ _HARD_TIMEOUT_MS = 15000
 def generate(route: Route, destination_path: Path, on_done: Callable[[bool], None]) -> None:
     """Fire-and-forget: on_done(success) is called exactly once, regardless of outcome."""
     window = Gtk.Window(default_width=_THUMBNAIL_WIDTH, default_height=_THUMBNAIL_HEIGHT)
-    # Fully transparent + undecorated: WebKit still needs a real presented window to render into
-    # (see module docstring - GTK4 dropped the off-screen render path), but there's no reason the
-    # user needs to see it flash on screen. get_snapshot() reads WebKit's own render texture
-    # directly, not the window's composited framebuffer, so zero opacity doesn't affect the
-    # captured content.
+    # Undecorated only (no title bar) - NOT fully transparent. Tried set_opacity(0.0) here first,
+    # confirmed live (both in test and by the user's own screenshot) that it silently breaks
+    # rendering: WebKit treats a zero-opacity window as hidden/backgrounded and throttles the
+    # page's requestAnimationFrame loop to near-never, so MapLibre's WebGL canvas never actually
+    # paints a frame - the page still loads and runs (pageReady fires fine), so this failure mode
+    # gives no error, just a blank map with the static attribution control still visible. GTK4 has
+    # no true off-screen render path for WebKit (see module docstring), so the window briefly
+    # shows on screen during generation.
     window.set_decorated(False)
-    window.set_opacity(0.0)
     content_manager = WebKit.UserContentManager()
     content_manager.register_script_message_handler("pageReady")
     webview = WebKit.WebView(user_content_manager=content_manager)
