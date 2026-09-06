@@ -169,6 +169,24 @@
     map.getSource('waypoints').setData(geojson);
   });
 
+  // Route creator only - called once when an existing route's waypoints finish loading for
+  // editing, so the map frames the route instead of sitting at its initial world view. Not
+  // called on every subsequent waypoint change (each tap while building a route calls
+  // setWaypoints alone) - same reasoning as setPreviewRoute above.
+  window.fitBoundsToWaypoints = _whenMapReady(function (geojson) {
+    const coords = geojson.features.map((f) => f.geometry.coordinates);
+    if (coords.length === 0) return;
+    if (coords.length === 1) {
+      map.jumpTo({ center: coords[0], zoom: 15 });
+      return;
+    }
+    const bounds = coords.reduce(
+      (b, c) => b.extend(c),
+      new maplibregl.LngLatBounds(coords[0], coords[0])
+    );
+    map.fitBounds(bounds, { padding: 60, duration: 0 });
+  });
+
   // Same shape as setRoute, but without recentring on every call - the rider is actively
   // tapping the map and a fitBounds jump after each tap would fight their own panning/zooming.
   window.setPreviewRoute = _whenMapReady(function (geojson) {

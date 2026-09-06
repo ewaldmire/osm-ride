@@ -99,6 +99,7 @@ class RouteCreatorView(ToolbarPage):
         self._name_entry.set_text(summary.name)
         self._clear_preview()
         self.map_view.set_waypoints(self._waypoints)
+        self.map_view.fit_bounds_to_waypoints(self._waypoints)
         if len(self._waypoints) >= 2:
             self._route_current_waypoints()
         if show_derived_hint:

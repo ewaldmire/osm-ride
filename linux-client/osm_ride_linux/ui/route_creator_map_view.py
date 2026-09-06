@@ -73,6 +73,16 @@ class RouteCreatorMapView(Gtk.Box):
         }
         self._run_js(f"window.setWaypoints({json.dumps(geojson)});")
 
+    def fit_bounds_to_waypoints(self, waypoints: list[RouteWaypoint]) -> None:
+        geojson = {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [wp.lon, wp.lat]}, "properties": {}}
+                for wp in waypoints
+            ],
+        }
+        self._run_js(f"window.fitBoundsToWaypoints({json.dumps(geojson)});")
+
     def set_preview_route(self, points: list[RouteWaypoint]) -> None:
         if len(points) < 2:
             geojson = {"type": "FeatureCollection", "features": []}

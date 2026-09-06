@@ -3,6 +3,7 @@ package com.ewaldmire.osmride.ui.routecreator
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +43,11 @@ fun RouteCreatorMapView(
 ) {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
+    // Fits the camera to the route's bounds exactly once, the first time waypoints go from
+    // empty to non-empty (i.e. an existing route just finished loading for editing) - not on
+    // every subsequent waypoints change, or each tap while building a new route would yank the
+    // camera back to fit the whole-so-far route instead of leaving it where the user placed it.
+    val hasCenteredOnce = remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         mapView.onStart()
@@ -77,16 +83,6 @@ fun RouteCreatorMapView(
                         PropertyFactory.circleStrokeWidth(2f),
                     ),
                 )
-
-                if (waypoints.isEmpty()) return@setStyle
-                val boundsBuilder = LatLngBounds.Builder()
-                waypoints.forEach { boundsBuilder.include(LatLng(it.lat, it.lon)) }
-                if (waypoints.size == 1) {
-                    val only = waypoints.first()
-                    map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(only.lat, only.lon), 15.0))
-                } else {
-                    map.moveCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 96))
-                }
             }
         }
         onDispose { }
@@ -97,6 +93,18 @@ fun RouteCreatorMapView(
             val style = map.style ?: return@getMapAsync
             val source = style.getSourceAs<GeoJsonSource>(WAYPOINTS_SOURCE_ID) ?: return@getMapAsync
             source.setGeoJson(waypointsGeoJson(waypoints))
+
+            if (!hasCenteredOnce.value && waypoints.isNotEmpty()) {
+                hasCenteredOnce.value = true
+                if (waypoints.size == 1) {
+                    val only = waypoints.first()
+                    map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(only.lat, only.lon), 15.0))
+                } else {
+                    val boundsBuilder = LatLngBounds.Builder()
+                    waypoints.forEach { boundsBuilder.include(LatLng(it.lat, it.lon)) }
+                    map.moveCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 96))
+                }
+            }
         }
         onDispose { }
     }
