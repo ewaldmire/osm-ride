@@ -22,7 +22,7 @@ class RideHistoryRepository(context: Context) {
     /** Newest first. */
     val rides: StateFlow<List<RideRecord>> = _rides.asStateFlow()
 
-    suspend fun saveRide(routeName: String, stats: RideStats, gpxContent: String): RideRecord =
+    suspend fun saveRide(routeName: String, routeId: String?, stats: RideStats, gpxContent: String): RideRecord =
         withContext(Dispatchers.IO) {
             val id = UUID.randomUUID().toString()
             val fileName = "$id.gpx"
@@ -32,6 +32,7 @@ class RideHistoryRepository(context: Context) {
                 id = id,
                 routeName = routeName,
                 title = routeName,
+                routeId = routeId,
                 completedAtEpochMillis = System.currentTimeMillis(),
                 distanceMeters = stats.distanceMeters,
                 durationSeconds = stats.elapsedSeconds,

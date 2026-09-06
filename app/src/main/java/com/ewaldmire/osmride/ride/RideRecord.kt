@@ -15,6 +15,9 @@ data class RideRecord(
     val routeName: String,
     val title: String = routeName,
     val notes: String = "",
+    /** Null for rides saved before this field existed, and for rides whose route was later
+     * deleted - either way, history falls back to a placeholder thumbnail. */
+    val routeId: String? = null,
     val completedAtEpochMillis: Long,
     val distanceMeters: Double,
     val durationSeconds: Long,

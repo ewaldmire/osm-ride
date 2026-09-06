@@ -358,7 +358,7 @@ class RideView(Gtk.Overlay):
         # Saved to history immediately (title = route name by default), same as Android's
         # RideSummaryViewModel - the summary screen lets the rider rename/annotate it afterward
         # rather than gating the save on that.
-        record = self.app.history_repository.save_ride(route.name, stats, gpx_text)
+        record = self.app.history_repository.save_ride(route.name, route.id, stats, gpx_text)
         self._route = None
         self._engine = None
         self.window.show_ride_summary(record)

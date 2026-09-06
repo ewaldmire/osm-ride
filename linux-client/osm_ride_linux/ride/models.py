@@ -116,6 +116,9 @@ class RideRecord:
     title: str | None = None
     notes: str = ""
     estimated_kilocalories: float | None = None
+    # None for rides saved before this field existed, and for rides whose route was later
+    # deleted - either way, history falls back to a placeholder thumbnail.
+    route_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.title is None:

@@ -33,7 +33,7 @@ class RideSummaryViewModel(application: Application) : AndroidViewModel(applicat
         if (e != null && hasTrackPoints) {
             viewModelScope.launch {
                 val gpxContent = GpxWriter.write(routeName, e.trackPointsSnapshot())
-                _savedRecord.value = historyRepository.saveRide(routeName, stats, gpxContent)
+                _savedRecord.value = historyRepository.saveRide(routeName, e.route.id, stats, gpxContent)
             }
         }
     }

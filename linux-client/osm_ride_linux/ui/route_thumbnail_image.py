@@ -44,3 +44,20 @@ class RouteThumbnailImage(Gtk.DrawingArea):
         cr.set_source_surface(self._surface, 0, 0)
         cr.paint()
         cr.restore()
+
+
+def build_thumbnail_widget(
+    thumb_path: Path | None, width: int, height: int, placeholder_icon_name: str
+) -> Gtk.Widget:
+    """Shared by RoutesView and HistoryView - both show the same cached route thumbnail at the
+    same size, falling back to a placeholder icon when there isn't one yet (not generated, still
+    generating, or the route predates thumbnails/was deleted)."""
+    if thumb_path is not None and thumb_path.exists():
+        thumbnail = RouteThumbnailImage(thumb_path, width, height)
+        thumbnail.add_css_class("card")
+        return thumbnail
+    placeholder = Gtk.Image(icon_name=placeholder_icon_name, pixel_size=40)
+    placeholder.add_css_class("dim-label")
+    placeholder.add_css_class("card")
+    placeholder.set_size_request(width, height)
+    return placeholder

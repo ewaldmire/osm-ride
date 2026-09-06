@@ -32,7 +32,7 @@ class RideHistoryRepository:
         # Newest first.
         self.rides: list[RideRecord] = self._load_index()
 
-    def save_ride(self, route_name: str, stats: RideStats, gpx_content: str) -> RideRecord:
+    def save_ride(self, route_name: str, route_id: str | None, stats: RideStats, gpx_content: str) -> RideRecord:
         record_id = str(uuid.uuid4())
         file_name = f"{record_id}.gpx"
         (self._rides_dir / file_name).write_text(gpx_content, encoding="utf-8")
@@ -41,6 +41,7 @@ class RideHistoryRepository:
             id=record_id,
             route_name=route_name,
             title=route_name,
+            route_id=route_id,
             completed_at_epoch_millis=int(time.time() * 1000),
             distance_meters=stats.distance_meters,
             duration_seconds=stats.elapsed_seconds,

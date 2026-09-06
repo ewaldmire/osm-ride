@@ -11,10 +11,16 @@ import kotlinx.coroutines.launch
 
 class RideHistoryViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as OsmRideApp).rideHistoryRepository
+    private val routeRepository = (application as OsmRideApp).routeRepository
 
     val rides: StateFlow<List<RideRecord>> = repository.rides
 
     fun gpxFile(record: RideRecord): File = repository.gpxFile(record)
+
+    /** Reuses the route's own thumbnail rather than generating a separate one for history - null
+     * when the ride predates this field, or its route was since deleted. */
+    fun thumbnailFile(record: RideRecord): File? =
+        record.routeId?.let { routeRepository.getRouteSummary(it) }?.let { routeRepository.thumbnailFile(it) }
 
     fun deleteRide(id: String) {
         viewModelScope.launch { repository.deleteRide(id) }

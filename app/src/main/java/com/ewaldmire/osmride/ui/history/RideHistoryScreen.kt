@@ -1,17 +1,24 @@
 package com.ewaldmire.osmride.ui.history
 
 import android.content.Intent
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
@@ -33,7 +40,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,6 +51,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.RideRecord
 import com.ewaldmire.osmride.util.Units
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -92,6 +103,7 @@ fun RideHistoryScreen(viewModel: RideHistoryViewModel = viewModel()) {
                 items(rides, key = { it.id }) { record ->
                     RideRecordCard(
                         record = record,
+                        thumbnailFile = viewModel.thumbnailFile(record),
                         onEdit = { editingRecord = record },
                         onShare = {
                             val file = viewModel.gpxFile(record)
@@ -152,55 +164,87 @@ private fun OverviewStat(label: String, value: String) {
 @Composable
 private fun RideRecordCard(
     record: RideRecord,
+    thumbnailFile: File?,
     onEdit: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    // Reuses the route's own cached thumbnail (see RoutesListScreen.RouteCard) rather than
+    // generating a separate one per ride - same file, same 160x96dp/5:3 Fit presentation.
+    val bitmap = remember(thumbnailFile) {
+        thumbnailFile?.let { file -> BitmapFactory.decodeFile(file.path)?.asImageBitmap() }
+    }
+
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(record.title, style = MaterialTheme.typography.titleMedium)
-                    if (record.title != record.routeName) {
-                        Text("Route: ${record.routeName}", style = MaterialTheme.typography.bodySmall)
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Box(modifier = Modifier.size(width = 160.dp, height = 96.dp)) {
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    // No thumbnail to show - the ride predates this field, or its route has
+                    // since been deleted or never got a thumbnail generated.
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        Icon(
+                            Icons.Filled.DirectionsBike,
+                            contentDescription = null,
+                            modifier = Modifier.align(Alignment.Center).size(32.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 12.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(record.title, style = MaterialTheme.typography.titleMedium)
+                        if (record.title != record.routeName) {
+                            Text("Route: ${record.routeName}", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(
+                            formatDate(record.completedAtEpochMillis),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Row {
+                        IconButton(onClick = onEdit) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit name/notes")
+                        }
+                        IconButton(onClick = onShare) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share GPX")
+                        }
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete ride")
+                        }
+                    }
+                }
+                if (record.notes.isNotBlank()) {
                     Text(
-                        formatDate(record.completedAtEpochMillis),
-                        style = MaterialTheme.typography.bodySmall,
+                        record.notes,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit name/notes")
-                    }
-                    IconButton(onClick = onShare) {
-                        Icon(Icons.Filled.Share, contentDescription = "Share GPX")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete ride")
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(Units.formatMiles(record.distanceMeters), style = MaterialTheme.typography.bodyMedium)
+                    Text(Units.formatDuration(record.durationSeconds), style = MaterialTheme.typography.bodyMedium)
+                    Text(Units.formatMph(record.avgSpeedMps), style = MaterialTheme.typography.bodyMedium)
+                    Text(Units.formatKilocalories(record.estimatedKilocalories), style = MaterialTheme.typography.bodyMedium)
                 }
-            }
-            if (record.notes.isNotBlank()) {
-                Text(
-                    record.notes,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(Units.formatMiles(record.distanceMeters), style = MaterialTheme.typography.bodyMedium)
-                Text(Units.formatDuration(record.durationSeconds), style = MaterialTheme.typography.bodyMedium)
-                Text(Units.formatMph(record.avgSpeedMps), style = MaterialTheme.typography.bodyMedium)
-                Text(Units.formatKilocalories(record.estimatedKilocalories), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
