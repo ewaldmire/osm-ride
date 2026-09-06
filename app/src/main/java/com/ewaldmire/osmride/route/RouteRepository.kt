@@ -138,6 +138,10 @@ class RouteRepository(context: Context) {
     fun thumbnailFile(summary: RouteSummary): File? =
         summary.thumbnailFileName?.let { File(routesDir, it) }
 
+    /** The route's own GPX file, for exporting/sharing - see RideHistoryRepository.gpxFile for
+     * the equivalent on saved rides. */
+    fun routeFile(summary: RouteSummary): File = File(routesDir, summary.fileName)
+
     /** Backfills a derived waypoint list onto an imported route the first time it's opened for
      * editing - lazy, not done at import time, so most imports never pay this cost. */
     suspend fun setWaypoints(id: String, waypoints: List<RouteWaypoint>) = withContext(Dispatchers.IO) {

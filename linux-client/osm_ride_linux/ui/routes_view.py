@@ -34,7 +34,7 @@ class RoutesView(ToolbarPage):
 
         header = Adw.HeaderBar(
             title_widget=Adw.WindowTitle(
-                title="New Ride", subtitle="Create a route on the map, or import a GPX file"
+                title="New Ride", subtitle="Create a route or import a GPX file, then tap it to start riding"
             )
         )
         create_button = Gtk.Button(label="Create Route…")
@@ -105,6 +105,12 @@ class RoutesView(ToolbarPage):
         edit_button.connect("clicked", lambda _b, s=summary: self._edit(s))
         row.add_suffix(edit_button)
 
+        export_button = Gtk.Button(icon_name="document-send-symbolic", valign=Gtk.Align.CENTER)
+        export_button.set_tooltip_text("Export Route")
+        export_button.add_css_class("flat")
+        export_button.connect("clicked", lambda _b, s=summary: self._export(s))
+        row.add_suffix(export_button)
+
         delete_button = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
         delete_button.set_tooltip_text("Delete")
         delete_button.add_css_class("flat")
@@ -130,6 +136,22 @@ class RoutesView(ToolbarPage):
 
     def _delete(self, summary: RouteSummary) -> None:
         self._repo.delete_route(summary.id)
+
+    def _export(self, summary: RouteSummary) -> None:
+        dialog = Gtk.FileDialog(title="Export Route", initial_name=f"{summary.name}.gpx")
+        dialog.save(self.window, None, lambda d, r, s=summary: self._on_export_finished(d, r, s))
+
+    def _on_export_finished(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult, summary: RouteSummary) -> None:
+        try:
+            file = dialog.save_finish(result)
+        except GLib.Error:
+            return  # cancelled
+        destination = Path(file.get_path())
+        source = self._repo.route_file(summary)
+        try:
+            destination.write_bytes(source.read_bytes())
+        except OSError as e:
+            self._show_error(f"Could not export route: {e}")
 
     def _on_import_clicked(self, _button: Gtk.Button) -> None:
         dialog = Gtk.FileDialog(title="Import GPX Route")

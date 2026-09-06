@@ -1,5 +1,6 @@
 package com.ewaldmire.osmride.ui.routes
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +53,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.route.RouteSummary
@@ -94,7 +97,7 @@ fun RoutesListScreen(
                     Column {
                         Text("New Ride")
                         Text(
-                            "Create a route on the map, or import a GPX file",
+                            "Create a route or import a GPX file, then tap it to start riding",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -151,6 +154,20 @@ fun RoutesListScreen(
                                 onEditRoute(route.id, showDerivedHint)
                             }
                         },
+                        onExport = {
+                            val file = viewModel.routeFile(route)
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file,
+                            )
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/gpx+xml"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Export route"))
+                        },
                         onDelete = { viewModel.deleteRoute(route.id) },
                     )
                 }
@@ -197,6 +214,7 @@ private fun RouteCard(
     thumbnailFile: File?,
     onClick: () -> Unit,
     onEdit: () -> Unit,
+    onExport: () -> Unit,
     onDelete: () -> Unit,
 ) {
     // Cheap to decode on every recomposition at this size (a small cached PNG, not the full map)
@@ -260,6 +278,9 @@ private fun RouteCard(
                     // way (see RoutesListViewModel.prepareEdit).
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Filled.Edit, contentDescription = "Edit route")
+                    }
+                    IconButton(onClick = onExport) {
+                        Icon(Icons.Filled.Share, contentDescription = "Export route")
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete route")

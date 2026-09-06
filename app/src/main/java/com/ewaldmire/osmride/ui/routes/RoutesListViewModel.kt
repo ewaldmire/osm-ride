@@ -78,4 +78,6 @@ class RoutesListViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun thumbnailFile(summary: RouteSummary): File? = repository.thumbnailFile(summary)
+
+    fun routeFile(summary: RouteSummary): File = repository.routeFile(summary)
 }

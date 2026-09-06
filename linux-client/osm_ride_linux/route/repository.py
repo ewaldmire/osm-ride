@@ -102,6 +102,11 @@ class RouteRepository:
             return None
         return self._routes_dir / summary.thumbnail_file_name
 
+    def route_file(self, summary: RouteSummary) -> Path:
+        """The route's own GPX file, for exporting - see RideHistoryRepository.gpx_file for the
+        equivalent on saved rides."""
+        return self._routes_dir / summary.file_name
+
     def set_waypoints(self, route_id: str, waypoints: list[RouteWaypoint]) -> None:
         """Backfills a derived waypoint list onto an imported route the first time it's opened
         for editing - lazy, not done at import time, so most imports never pay this cost."""
