@@ -17,7 +17,7 @@ from ..route.models import RouteSummary  # noqa: E402
 from ..route.repository import RouteRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
 from . import route_thumbnail_generator  # noqa: E402
-from .route_thumbnail_image import RouteThumbnailImage  # noqa: E402
+from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
 
 # Same 5:3 aspect ratio as the generated PNG (see route_thumbnail_generator.py's
@@ -32,7 +32,11 @@ class RoutesView(ToolbarPage):
         self.window = window
         self._repo = window.app.route_repository
 
-        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="New Ride"))
+        header = Adw.HeaderBar(
+            title_widget=Adw.WindowTitle(
+                title="New Ride", subtitle="Create a route on the map, or import a GPX file"
+            )
+        )
         create_button = Gtk.Button(label="Create Route…")
         create_button.connect("clicked", lambda _b: window.show_route_creator_new())
         import_button = Gtk.Button(label="Import GPX…")
@@ -77,19 +81,6 @@ class RoutesView(ToolbarPage):
         for row in self._route_rows:
             self._routes_group.add(row)
 
-    def _build_thumbnail_widget(self, thumb_path: Path | None) -> Gtk.Widget:
-        if thumb_path is not None and thumb_path.exists():
-            thumbnail = RouteThumbnailImage(thumb_path, _THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT)
-            thumbnail.add_css_class("card")
-            return thumbnail
-        # No cached snapshot yet (not generated, still generating, or this route predates the
-        # feature) - a plain icon placeholder rather than leaving a gap.
-        placeholder = Gtk.Image(icon_name="mark-location-symbolic", pixel_size=40)
-        placeholder.add_css_class("dim-label")
-        placeholder.add_css_class("card")
-        placeholder.set_size_request(_THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT)
-        return placeholder
-
     def _build_row(self, summary: RouteSummary) -> Adw.ActionRow:
         row = Adw.ActionRow(
             title=summary.name,
@@ -100,7 +91,9 @@ class RoutesView(ToolbarPage):
         row.connect("activated", lambda _r, s=summary: self._select(s))
 
         thumb_path = self._repo.thumbnail_path(summary)
-        thumbnail = self._build_thumbnail_widget(thumb_path)
+        thumbnail = build_thumbnail_widget(
+            thumb_path, _THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT, "mark-location-symbolic"
+        )
         row.add_prefix(thumbnail)
 
         # Every route opens the full route creator to edit - which already has its own name

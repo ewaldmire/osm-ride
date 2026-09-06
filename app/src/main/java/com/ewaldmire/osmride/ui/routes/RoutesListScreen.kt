@@ -90,7 +90,15 @@ fun RoutesListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("New Ride") },
+                title = {
+                    Column {
+                        Text("New Ride")
+                        Text(
+                            "Create a route on the map, or import a GPX file",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
