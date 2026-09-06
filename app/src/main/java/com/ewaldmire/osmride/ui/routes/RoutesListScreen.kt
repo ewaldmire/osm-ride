@@ -20,13 +20,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddRoad
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +36,7 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,14 +97,13 @@ fun RoutesListScreen(
                     }
                 },
                 actions = {
-                    // Top bar, not a floating action button - a bottom FAB stack covered the
-                    // edit/delete icons on whatever route card happened to be last in the list.
-                    IconButton(onClick = onCreateRoute) {
-                        Icon(Icons.Filled.AddRoad, contentDescription = "Create route")
-                    }
-                    IconButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
-                        Icon(Icons.Filled.UploadFile, contentDescription = "Import GPX")
-                    }
+                    // Text actions, not icon-only - a bare AddRoad/UploadFile icon pair reads as
+                    // "hard to tell what they do" (confirmed by the user) once there's no FAB
+                    // label next to it. Matches Linux's labeled "Create Route…"/"Import GPX…"
+                    // header bar buttons, not just moved to fix the FAB overlapping the last
+                    // route card's edit/delete icons.
+                    TextButton(onClick = onCreateRoute) { Text("Create") }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
                 },
             )
         },
