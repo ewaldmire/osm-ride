@@ -20,7 +20,7 @@ private data class BottomBarTab(val route: String, val label: String, val icon: 
 private val bottomBarTabs = listOf(
     BottomBarTab(Destinations.HISTORY, "History", Icons.Filled.History),
     BottomBarTab(Destinations.ROUTES_LIST, "Ride", Icons.Filled.DirectionsBike),
-    BottomBarTab(Destinations.WORKOUTS_LIST, "Workouts", Icons.Filled.FitnessCenter),
+    BottomBarTab(Destinations.WORKOUTS_LIST, "Workout", Icons.Filled.FitnessCenter),
     BottomBarTab(Destinations.SETTINGS, "Settings", Icons.Filled.Settings),
 )
 

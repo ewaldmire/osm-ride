@@ -1,5 +1,5 @@
 """Mirrors app/src/main/java/com/ewaldmire/osmride/ui/settings/WorkoutsListScreen.kt: import
-.erg/.mrc/.zwo workout files, list with duration/avg watts/profile chart, rename, delete.
+.erg/.mrc/.zwo workout files, list with duration/avg watts/profile chart, edit, delete.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class WorkoutsView(ToolbarPage):
 
         header = Adw.HeaderBar(
             title_widget=Adw.WindowTitle(
-                title="Workouts", subtitle="Import .erg, .mrc, or .zwo files for ERG mode"
+                title="Workout", subtitle="Import .erg, .mrc, or .zwo files for ERG mode"
             )
         )
         create_button = Gtk.Button(label="Create Workout…")
@@ -96,17 +96,13 @@ class WorkoutsView(ToolbarPage):
 
         row = Adw.ExpanderRow(title=workout.name, subtitle=summary_text)
 
-        edit_blocks_button = Gtk.Button(icon_name="view-pin-symbolic", valign=Gtk.Align.CENTER)
-        edit_blocks_button.set_tooltip_text("Edit Blocks")
-        edit_blocks_button.add_css_class("flat")
-        edit_blocks_button.connect("clicked", lambda _b, w=workout: self.window.show_workout_creator_edit(w.id))
-        row.add_suffix(edit_blocks_button)
-
-        rename_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
-        rename_button.set_tooltip_text("Rename")
-        rename_button.add_css_class("flat")
-        rename_button.connect("clicked", lambda _b, w=workout: self._rename(w))
-        row.add_suffix(rename_button)
+        # Opens the full workout creator, which already has its own name field - covers renaming
+        # too, same simplification as RoutesView's single Edit button.
+        edit_button = Gtk.Button(icon_name="document-edit-symbolic", valign=Gtk.Align.CENTER)
+        edit_button.set_tooltip_text("Edit Workout")
+        edit_button.add_css_class("flat")
+        edit_button.connect("clicked", lambda _b, w=workout: self.window.show_workout_creator_edit(w.id))
+        row.add_suffix(edit_button)
 
         delete_button = Gtk.Button(icon_name="user-trash-symbolic", valign=Gtk.Align.CENTER)
         delete_button.set_tooltip_text("Delete")
@@ -123,26 +119,6 @@ class WorkoutsView(ToolbarPage):
         row.add_row(chart_row)
 
         return row
-
-    def _rename(self, workout: Workout) -> None:
-        dialog = Adw.AlertDialog.new("Rename Workout", None)
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("save", "Save")
-        dialog.set_response_appearance("save", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("save")
-        dialog.set_close_response("cancel")
-
-        entry = Gtk.Entry()
-        entry.set_text(workout.name)
-        dialog.set_extra_child(entry)
-
-        def on_response(_dialog: Adw.AlertDialog, response: str) -> None:
-            if response == "save":
-                new_name = entry.get_text().strip() or workout.name
-                self._repo.rename_workout(workout.id, new_name)
-
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
 
     def _delete(self, workout: Workout) -> None:
         self._repo.delete_workout(workout.id)

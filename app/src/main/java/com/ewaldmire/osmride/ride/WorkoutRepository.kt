@@ -99,13 +99,6 @@ class WorkoutRepository(context: Context) {
         Result.success(workout)
     }
 
-    suspend fun renameWorkout(id: String, name: String) = withContext(Dispatchers.IO) {
-        val resolved = name.ifBlank { return@withContext }
-        val updated = _workouts.value.map { if (it.id == id) it.copy(name = resolved) else it }
-        _workouts.value = updated
-        saveIndex(updated)
-    }
-
     suspend fun deleteWorkout(id: String) = withContext(Dispatchers.IO) {
         val updated = _workouts.value.filterNot { it.id == id }
         _workouts.value = updated

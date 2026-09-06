@@ -46,7 +46,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.add_titled_with_icon(self.routes_view, "routes", "Ride", "osm-ride-bike-symbolic")
 
         self.workouts_view = WorkoutsView(self)
-        self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workouts", "osm-ride-dumbbell-symbolic")
+        self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workout", "osm-ride-dumbbell-symbolic")
 
         self.settings_view = SettingsView(self)
         self.stack.add_titled_with_icon(self.settings_view, "settings", "Settings", "preferences-system-symbolic")

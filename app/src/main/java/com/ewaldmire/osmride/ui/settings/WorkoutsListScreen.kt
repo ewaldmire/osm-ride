@@ -15,21 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -41,10 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -66,7 +57,6 @@ fun WorkoutsListScreen(
     val workouts by viewModel.workouts.collectAsState()
     val importError by viewModel.importError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var renamingWorkout by remember { mutableStateOf<Workout?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
@@ -79,17 +69,6 @@ fun WorkoutsListScreen(
             snackbarHostState.showSnackbar(it)
             viewModel.clearImportError()
         }
-    }
-
-    renamingWorkout?.let { workout ->
-        RenameWorkoutDialog(
-            workout = workout,
-            onSave = { newName ->
-                viewModel.renameWorkout(workout.id, newName)
-                renamingWorkout = null
-            },
-            onDismiss = { renamingWorkout = null },
-        )
     }
 
     Scaffold(
@@ -109,21 +88,13 @@ fun WorkoutsListScreen(
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    // Matches RoutesListScreen's top-bar Create/Import actions - text, not
+                    // icon-only, and no longer a bottom FAB that could cover the last card.
+                    TextButton(onClick = onCreateWorkout) { Text("Create") }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
+                },
             )
-        },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ExtendedFloatingActionButton(
-                    onClick = onCreateWorkout,
-                    icon = { Icon(Icons.Filled.Tune, contentDescription = null) },
-                    text = { Text("Create") },
-                )
-                ExtendedFloatingActionButton(
-                    onClick = { importLauncher.launch(arrayOf("*/*")) },
-                    icon = { Icon(Icons.Filled.UploadFile, contentDescription = null) },
-                    text = { Text("Import") },
-                )
-            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
     ) { padding ->
@@ -134,7 +105,7 @@ fun WorkoutsListScreen(
             ) {
                 Icon(Icons.Filled.FitnessCenter, contentDescription = null)
                 Text(
-                    "No workouts yet. Tap + to import a file, or build one from scratch.",
+                    "No workouts yet. Use the buttons above to create or import one.",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(top = 12.dp),
                 )
@@ -148,8 +119,7 @@ fun WorkoutsListScreen(
                 items(workouts, key = { it.id }) { workout ->
                     WorkoutCard(
                         workout = workout,
-                        onRename = { renamingWorkout = workout },
-                        onEditBlocks = { onEditWorkout(workout.id) },
+                        onEdit = { onEditWorkout(workout.id) },
                         onDelete = { viewModel.deleteWorkout(workout.id) },
                     )
                 }
@@ -161,8 +131,7 @@ fun WorkoutsListScreen(
 @Composable
 private fun WorkoutCard(
     workout: Workout,
-    onRename: () -> Unit,
-    onEditBlocks: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -181,11 +150,10 @@ private fun WorkoutCard(
                     )
                 }
                 Row {
-                    IconButton(onClick = onEditBlocks) {
-                        Icon(Icons.Filled.Tune, contentDescription = "Edit workout blocks")
-                    }
-                    IconButton(onClick = onRename) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Rename workout")
+                    // Opens the full workout creator, which already has its own name field -
+                    // covers renaming too, same simplification as RoutesListScreen's RouteCard.
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit workout")
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete workout")
@@ -198,31 +166,6 @@ private fun WorkoutCard(
             )
         }
     }
-}
-
-@Composable
-private fun RenameWorkoutDialog(workout: Workout, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember(workout.id) { mutableStateOf(workout.name) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rename Workout") },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Workout name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(name.ifBlank { workout.name }) }) { Text("Save") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
 }
 
 private fun Workout.averageWatts(): Int? {

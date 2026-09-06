@@ -31,10 +31,6 @@ class WorkoutsListViewModel(application: Application) : AndroidViewModel(applica
         _importError.value = null
     }
 
-    fun renameWorkout(id: String, name: String) {
-        viewModelScope.launch { repository.renameWorkout(id, name) }
-    }
-
     fun deleteWorkout(id: String) {
         viewModelScope.launch { repository.deleteWorkout(id) }
     }
