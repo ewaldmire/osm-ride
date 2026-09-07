@@ -12,6 +12,8 @@ named-page stack is enough."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -88,7 +90,11 @@ class MainWindow(Adw.ApplicationWindow):
     def show_settings(self) -> None:
         self.stack.set_visible_child_name("settings")
 
-    def show_pairing(self) -> None:
+    def show_pairing(self, on_back: Callable[[], None] | None = None) -> None:
+        # Defaults to Settings (where Pairing is normally opened from), but callers reached from
+        # elsewhere - e.g. the ride screen's "not connected" status, which needs to return to the
+        # in-progress ride rather than Settings - can override where the back button goes.
+        self.pairing_view.on_back = on_back or self.show_settings
         self.stack.set_visible_child_name("pairing")
 
     def show_routes(self) -> None:

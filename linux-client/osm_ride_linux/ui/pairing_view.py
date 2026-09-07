@@ -7,6 +7,8 @@ the Kotlin ViewModel's init block.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -23,9 +25,13 @@ class PairingView(ToolbarPage):
         self.window = window
         app = window.app
 
+        # Overwritten per-visit by MainWindow.show_pairing() - defaults to Settings since that's
+        # where Pairing is normally opened from.
+        self.on_back: Callable[[], None] = window.show_settings
+
         header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Pair Devices"))
         back = Gtk.Button(icon_name="go-previous-symbolic")
-        back.connect("clicked", lambda _b: window.show_settings())
+        back.connect("clicked", lambda _b: self.on_back())
         header.pack_start(back)
         self.add_top_bar(header)
 

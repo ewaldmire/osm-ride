@@ -106,7 +106,7 @@ class RideView(Gtk.Overlay):
 
     def _build_back_button(self) -> None:
         back = Gtk.Button(icon_name="go-previous-symbolic")
-        back.set_tooltip_text("Back to Ride")
+        back.set_tooltip_text("Back to Ride List")
         back.set_valign(Gtk.Align.START)
         back.set_halign(Gtk.Align.END)
         back.set_margin_top(_DRAG_BAR_HEIGHT + 12)
@@ -161,10 +161,18 @@ class RideView(Gtk.Overlay):
         box.append(self._workout_chart)
 
         # Unwrapped, this label's own natural width (long messages like "Trainer not connected -
-        # pair it first to track distance.") would drag the whole panel wider than intended,
-        # leaving the compact stat rows above looking sparse against all that extra space.
+        # tap to pair.") would drag the whole panel wider than intended, leaving the compact stat
+        # rows above looking sparse against all that extra space.
+        #
+        # Wrapped in a button (flat, so it still just reads as text) rather than a plain label -
+        # there was previously no way back to pairing without ending the ride via Finish, so this
+        # message is the one place on the ride screen a rider can actually act on it. Only shown
+        # while disconnected; see _on_stats_changed.
         self._status_label = Gtk.Label(xalign=0.0, wrap=True, max_width_chars=24)
-        box.append(self._status_label)
+        self._status_button = Gtk.Button(child=self._status_label, halign=Gtk.Align.START)
+        self._status_button.add_css_class("flat")
+        self._status_button.connect("clicked", lambda _b: self._open_pairing())
+        box.append(self._status_button)
 
         panel.set_child(box)
         self.add_overlay(panel)
@@ -329,7 +337,8 @@ class RideView(Gtk.Overlay):
         self._send_trainer_control(stats)
 
         connected = self.app.trainer_client.connection_state == BleConnectionState.CONNECTED
-        self._status_label.set_text("" if connected else "Trainer not connected - pair it first to track distance.")
+        self._status_label.set_text("Trainer not connected - tap to pair.")
+        self._status_button.set_visible(not connected)
 
         if stats.state == RideState.FINISHED:
             self._on_ride_finished(stats)
@@ -462,3 +471,13 @@ class RideView(Gtk.Overlay):
     def _finish(self) -> None:
         if self._engine is not None:
             self._engine.finish_manually()
+
+    def _open_pairing(self) -> None:
+        # load_route() no-ops when the route id already matches the in-progress ride (see its own
+        # comment), so returning here via show_ride(route.id) resumes exactly where the rider
+        # left off instead of restarting anything.
+        route = self._route
+        if route is not None:
+            self.window.show_pairing(on_back=lambda: self.window.show_ride(route.id))
+        else:
+            self.window.show_pairing()

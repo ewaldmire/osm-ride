@@ -138,6 +138,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                                 popUpTo(Destinations.HISTORY)
                             }
                         },
+                        onOpenPairing = { navController.navigate(Destinations.PAIRING) },
                     )
                 }
             }

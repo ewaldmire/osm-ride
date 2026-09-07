@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +71,7 @@ import com.ewaldmire.osmride.util.Units
 fun RideScreen(
     routeId: String,
     onFinished: () -> Unit,
+    onOpenPairing: () -> Unit,
     viewModel: RideViewModel = viewModel(),
 ) {
     LaunchedEffect(routeId) { viewModel.loadRoute(routeId) }
@@ -178,6 +180,7 @@ fun RideScreen(
                 gradeControlState = gradeControlState,
                 trainerConnected = trainerConnected,
                 isLandscape = isLandscape,
+                onOpenPairing = onOpenPairing,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
@@ -204,6 +207,7 @@ fun RideScreen(
                 gradeControlState = gradeControlState,
                 trainerConnected = trainerConnected,
                 isLandscape = isLandscape,
+                onOpenPairing = onOpenPairing,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
@@ -245,6 +249,7 @@ private fun StatsCard(
     gradeControlState: GradeControlState,
     trainerConnected: BleConnectionState,
     isLandscape: Boolean,
+    onOpenPairing: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // SpaceBetween looks right in portrait, where the card spans the full screen width - but in
@@ -307,11 +312,16 @@ private fun StatsCard(
                 )
             }
             if (trainerConnected != BleConnectionState.CONNECTED) {
+                // Tappable, not just informational - there was previously no way back to
+                // pairing without ending the ride (Finish); the whole point of surfacing this
+                // message is that the rider probably wants to fix it right now.
                 Text(
-                    "Trainer not connected — pair it first to track distance.",
+                    "Trainer not connected — tap to pair.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable(onClick = onOpenPairing),
                 )
             }
         }
