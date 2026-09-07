@@ -17,6 +17,7 @@ class RideSummaryViewModel(application: Application) : AndroidViewModel(applicat
     private val app = application as OsmRideApp
     private val engine = app.currentRideEngine
     private val historyRepository = app.rideHistoryRepository
+    private val routeRepository = app.routeRepository
 
     val stats: RideStats = engine?.stats?.value ?: RideStats()
     val routeName: String = engine?.route?.name ?: "Ride"
@@ -39,6 +40,11 @@ class RideSummaryViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun gpxFileToShare(): File? = savedRecord.value?.let { historyRepository.gpxFile(it) }
+
+    // Keyed off the route directly (available synchronously) rather than savedRecord's routeId,
+    // so the thumbnail can show immediately instead of waiting on the async save to finish.
+    fun thumbnailFile(): File? =
+        engine?.route?.id?.let { routeRepository.getRouteSummary(it) }?.let { routeRepository.thumbnailFile(it) }
 
     fun saveTitleAndNotes(title: String, notes: String) {
         val id = savedRecord.value?.id ?: return

@@ -11,6 +11,8 @@ natural point (right when the engine reports FINISHED) is simpler and equivalent
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -20,7 +22,23 @@ from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
 from ..ride.models import RideRecord  # noqa: E402
 from ..util import units  # noqa: E402
+from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
+
+# Smaller than Routes'/History's 160x96 (same 5:3 aspect) - here it sits next to the name field
+# rather than owning a whole row/card to itself.
+_THUMBNAIL_DISPLAY_WIDTH = 120
+_THUMBNAIL_DISPLAY_HEIGHT = 72
+
+_STAT_LABELS = [
+    ("distance", "Distance"),
+    ("time", "Time"),
+    ("avg_speed", "Avg Speed"),
+    ("calories", "Calories"),
+    ("avg_power", "Avg Power"),
+    ("avg_cadence", "Avg Cadence"),
+    ("avg_heart_rate", "Avg Heart Rate"),
+]
 
 
 class RideSummaryView(ToolbarPage):
@@ -28,17 +46,25 @@ class RideSummaryView(ToolbarPage):
         super().__init__()
         self.window = window
         self._repo = window.app.history_repository
+        self._route_repo = window.app.route_repository
         self._record: RideRecord | None = None
 
         self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Ride Complete")))
 
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        outer.set_margin_top(20)
-        outer.set_margin_bottom(20)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        outer.set_margin_top(16)
+        outer.set_margin_bottom(16)
         outer.set_margin_start(24)
         outer.set_margin_end(24)
         outer.set_valign(Gtk.Align.START)
 
+        # Lets the rider see the route they just rode before they save, rather than only seeing
+        # it later from History - same thumbnail file Routes/History already resolve, just smaller.
+        header_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self._thumbnail_container = Gtk.Box()
+        header_row.append(self._thumbnail_container)
+
+        details_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True, valign=Gtk.Align.CENTER)
         details_group = Adw.PreferencesGroup()
         self._title_row = Adw.EntryRow(title="Ride name")
         details_group.add(self._title_row)
@@ -46,33 +72,46 @@ class RideSummaryView(ToolbarPage):
         self._route_label.add_css_class("dim-label")
         self._route_label.add_css_class("caption")
         self._route_label.set_margin_start(6)
-        outer.append(details_group)
-        outer.append(self._route_label)
+        details_col.append(details_group)
+        details_col.append(self._route_label)
+        header_row.append(details_col)
+        outer.append(header_row)
 
         notes_label = Gtk.Label(label="Notes", xalign=0.0)
         self._notes_view = Gtk.TextView()
-        self._notes_view.set_size_request(-1, 80)
+        self._notes_view.set_size_request(-1, 60)
         self._notes_view.set_wrap_mode(Gtk.WrapMode.WORD)
         notes_frame = Gtk.Frame()
         notes_frame.set_child(self._notes_view)
         outer.append(notes_label)
         outer.append(notes_frame)
 
-        self._stats_group = Adw.PreferencesGroup(title="Summary")
-        self._stat_rows: dict[str, Adw.ActionRow] = {}
-        for key, label in [
-            ("distance", "Distance"),
-            ("time", "Time"),
-            ("avg_speed", "Avg Speed"),
-            ("calories", "Calories"),
-            ("avg_power", "Avg Power"),
-            ("avg_cadence", "Avg Cadence"),
-            ("avg_heart_rate", "Avg Heart Rate"),
-        ]:
-            row = Adw.ActionRow(title=label)
-            self._stat_rows[key] = row
-            self._stats_group.add(row)
-        outer.append(self._stats_group)
+        stats_label = Gtk.Label(label="Summary", xalign=0.0)
+        outer.append(stats_label)
+
+        # A 3-column Gtk.Grid instead of one Adw.ActionRow per stat (7 full-width rows) - the
+        # single biggest contributor to this screen needing a scroll before.
+        stats_grid = Gtk.Grid(column_spacing=16, row_spacing=8, column_homogeneous=True)
+        stats_grid.set_margin_top(10)
+        stats_grid.set_margin_bottom(10)
+        stats_grid.set_margin_start(10)
+        stats_grid.set_margin_end(10)
+        self._stat_value_labels: dict[str, Gtk.Label] = {}
+        for i, (key, label) in enumerate(_STAT_LABELS):
+            col, row = i % 3, i // 3
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, halign=Gtk.Align.CENTER)
+            value_label = Gtk.Label()
+            value_label.add_css_class("title-4")
+            caption_label = Gtk.Label(label=label)
+            caption_label.add_css_class("caption")
+            caption_label.add_css_class("dim-label")
+            box.append(value_label)
+            box.append(caption_label)
+            self._stat_value_labels[key] = value_label
+            stats_grid.attach(box, col, row, 1, 1)
+        stats_frame = Gtk.Frame()
+        stats_frame.set_child(stats_grid)
+        outer.append(stats_frame)
 
         saved_label = Gtk.Label(label="Saved to ride history.", xalign=0.0)
         saved_label.add_css_class("dim-label")
@@ -101,13 +140,32 @@ class RideSummaryView(ToolbarPage):
         buf = self._notes_view.get_buffer()
         buf.set_text(record.notes)
 
-        self._stat_rows["distance"].set_subtitle(units.format_miles(record.distance_meters))
-        self._stat_rows["time"].set_subtitle(units.format_duration(record.duration_seconds))
-        self._stat_rows["avg_speed"].set_subtitle(units.format_mph(record.avg_speed_mps))
-        self._stat_rows["calories"].set_subtitle(units.format_kilocalories(record.estimated_kilocalories))
-        self._stat_rows["avg_power"].set_subtitle(units.format_watts(record.avg_power_watts))
-        self._stat_rows["avg_cadence"].set_subtitle(units.format_cadence(record.avg_cadence_rpm))
-        self._stat_rows["avg_heart_rate"].set_subtitle(units.format_heart_rate(record.avg_heart_rate_bpm))
+        child = self._thumbnail_container.get_first_child()
+        if child is not None:
+            self._thumbnail_container.remove(child)
+        thumbnail = build_thumbnail_widget(
+            self._thumbnail_path(record),
+            _THUMBNAIL_DISPLAY_WIDTH,
+            _THUMBNAIL_DISPLAY_HEIGHT,
+            "document-open-recent-symbolic",
+        )
+        self._thumbnail_container.append(thumbnail)
+
+        self._stat_value_labels["distance"].set_text(units.format_miles(record.distance_meters))
+        self._stat_value_labels["time"].set_text(units.format_duration(record.duration_seconds))
+        self._stat_value_labels["avg_speed"].set_text(units.format_mph(record.avg_speed_mps))
+        self._stat_value_labels["calories"].set_text(units.format_kilocalories(record.estimated_kilocalories))
+        self._stat_value_labels["avg_power"].set_text(units.format_watts(record.avg_power_watts))
+        self._stat_value_labels["avg_cadence"].set_text(units.format_cadence(record.avg_cadence_rpm))
+        self._stat_value_labels["avg_heart_rate"].set_text(units.format_heart_rate(record.avg_heart_rate_bpm))
+
+    def _thumbnail_path(self, record: RideRecord) -> Path | None:
+        if record.route_id is None:
+            return None
+        summary = self._route_repo.get_route_summary(record.route_id)
+        if summary is None:
+            return None
+        return self._route_repo.thumbnail_path(summary)
 
     def _on_done(self) -> None:
         if self._record is not None:
