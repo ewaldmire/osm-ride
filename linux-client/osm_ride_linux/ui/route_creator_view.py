@@ -202,7 +202,7 @@ class RouteCreatorView(ToolbarPage):
             if success:
                 self._repo.set_thumbnail(summary.id, thumbnail_file_name)
 
-        route_thumbnail_generator.generate(route, destination, on_done)
+        route_thumbnail_generator.generate(route.points, destination, on_done)
 
     def _show_error(self, message: str) -> None:
         dialog = Adw.AlertDialog.new("Error", message)

@@ -8,7 +8,6 @@ Mirrors app/src/main/java/com/ewaldmire/osmride/ui/history/RideHistoryScreen.kt.
 from __future__ import annotations
 
 import datetime
-from pathlib import Path
 
 import gi
 
@@ -22,8 +21,9 @@ from ..util import units  # noqa: E402
 from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
 
-# Same 5:3 aspect/size as RoutesView's thumbnails (see routes_view.py) - history reuses the
-# route's own cached thumbnail rather than generating a separate one per ride.
+# Same 5:3 aspect/size as RoutesView's thumbnails (see routes_view.py) - a snapshot of each ride's
+# own recorded track, not the route's planning thumbnail (see ride_view.py's
+# _generate_ride_thumbnail).
 _THUMBNAIL_DISPLAY_WIDTH = 160
 _THUMBNAIL_DISPLAY_HEIGHT = 96
 
@@ -33,7 +33,6 @@ class HistoryView(ToolbarPage):
         super().__init__()
         self.window = window
         self._repo = window.app.history_repository
-        self._route_repo = window.app.route_repository
 
         self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="History")))
 
@@ -101,22 +100,16 @@ class HistoryView(ToolbarPage):
             stats_box.append(col)
         self._overview_row.set_child(stats_box)
 
-    def _thumbnail_path(self, record: RideRecord) -> Path | None:
-        if record.route_id is None:
-            return None
-        summary = self._route_repo.get_route_summary(record.route_id)
-        if summary is None:
-            return None
-        return self._route_repo.thumbnail_path(summary)
-
     def _build_row(self, record: RideRecord) -> Adw.ActionRow:
         row = Adw.ActionRow(
             title=record.title or record.route_name,
             subtitle=self._format_date(record.completed_at_epoch_millis),
         )
 
+        # This ride's own recorded track, not the route's planning thumbnail - those can differ
+        # if the rider stopped early or deviated (see ride_view.py's _generate_ride_thumbnail).
         thumbnail = build_thumbnail_widget(
-            self._thumbnail_path(record),
+            self._repo.thumbnail_path(record),
             _THUMBNAIL_DISPLAY_WIDTH,
             _THUMBNAIL_DISPLAY_HEIGHT,
             "document-open-recent-symbolic",

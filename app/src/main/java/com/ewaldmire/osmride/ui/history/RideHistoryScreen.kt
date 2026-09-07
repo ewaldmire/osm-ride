@@ -168,8 +168,9 @@ private fun RideRecordCard(
     onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    // Reuses the route's own cached thumbnail (see RoutesListScreen.RouteCard) rather than
-    // generating a separate one per ride - same file, same 160x96dp/5:3 Fit presentation.
+    // This ride's own recorded track, not the route's planning thumbnail (see
+    // RideSummaryViewModel.generateThumbnail) - same 160x96dp/5:3 Fit presentation as
+    // RoutesListScreen.RouteCard, just a different source image.
     val bitmap = remember(thumbnailFile) {
         thumbnailFile?.let { file -> BitmapFactory.decodeFile(file.path)?.asImageBitmap() }
     }

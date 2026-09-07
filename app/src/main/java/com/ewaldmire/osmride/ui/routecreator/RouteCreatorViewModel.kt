@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.maplibre.android.geometry.LatLng
 
 /**
  * Drives the route creator: tapped waypoints are re-routed onto roads via [BRouterClient] after
@@ -139,7 +140,8 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
             val route = routeRepository.loadRoute(summary.id) ?: return@launch
             val fileName = "${summary.id}_thumb.png"
             val destination = File(routeRepository.directory, fileName)
-            if (RouteThumbnailGenerator.generate(app, route, destination)) {
+            val points = route.points.map { LatLng(it.lat, it.lon) }
+            if (RouteThumbnailGenerator.generate(app, points, destination)) {
                 routeRepository.setThumbnail(summary.id, fileName)
             }
         }

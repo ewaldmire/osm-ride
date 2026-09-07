@@ -59,9 +59,24 @@ class RideHistoryRepository(context: Context) {
 
     fun gpxFile(record: RideRecord): File = File(ridesDir, record.gpxFileName)
 
+    /** Called once RouteThumbnailGenerator finishes snapshotting this ride's own recorded track -
+     * never blocks saveRide, since generation happens asynchronously afterward. */
+    suspend fun setThumbnail(id: String, thumbnailFileName: String) = withContext(Dispatchers.IO) {
+        val updated = _rides.value.map { if (it.id == id) it.copy(thumbnailFileName = thumbnailFileName) else it }
+        _rides.value = updated
+        saveIndex(updated)
+    }
+
+    fun thumbnailFile(record: RideRecord): File? =
+        record.thumbnailFileName?.let { File(ridesDir, it) }
+
+    /** Where a newly-generated ride thumbnail should be written - see RouteThumbnailGenerator. */
+    val directory: File get() = ridesDir
+
     suspend fun deleteRide(id: String) = withContext(Dispatchers.IO) {
         val record = _rides.value.find { it.id == id } ?: return@withContext
         File(ridesDir, record.gpxFileName).delete()
+        thumbnailFile(record)?.delete()
         val updated = _rides.value.filterNot { it.id == id }
         _rides.value = updated
         saveIndex(updated)

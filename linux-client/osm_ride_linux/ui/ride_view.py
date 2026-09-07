@@ -23,9 +23,10 @@ from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 from ..ble.models import BleConnectionState, HeartRateSample, TrainerSample  # noqa: E402
 from ..ride import gpx_writer  # noqa: E402
 from ..ride.engine import RideEngine  # noqa: E402
-from ..ride.models import RideState, RideStats, Workout  # noqa: E402
+from ..ride.models import RecordedTrackPoint, RideRecord, RideState, RideStats, Workout  # noqa: E402
 from ..route.models import Route  # noqa: E402
 from ..util import units  # noqa: E402
+from . import route_thumbnail_generator  # noqa: E402
 from .elevation_profile_chart import ElevationProfileChart  # noqa: E402
 from .ride_map_view import RideMapView  # noqa: E402
 from .workout_profile_chart import WorkoutProfileChart  # noqa: E402
@@ -363,7 +364,8 @@ class RideView(Gtk.Overlay):
         engine = self._engine
         if route is None or engine is None:
             return
-        gpx_text = gpx_writer.write(route.name, engine.track_points_snapshot())
+        track_points = engine.track_points_snapshot()
+        gpx_text = gpx_writer.write(route.name, track_points)
         # Saved to history immediately (title = route name by default), same as Android's
         # RideSummaryViewModel - the summary screen lets the rider rename/annotate it afterward
         # rather than gating the save on that.
@@ -371,6 +373,23 @@ class RideView(Gtk.Overlay):
         self._route = None
         self._engine = None
         self.window.show_ride_summary(record)
+        self._generate_ride_thumbnail(record, track_points)
+
+    def _generate_ride_thumbnail(self, record: RideRecord, track_points: list[RecordedTrackPoint]) -> None:
+        # This ride's own recorded track, not the route's planning thumbnail - those can differ
+        # if the rider stopped early or deviated. Generated after show_ride_summary() so the
+        # summary screen appears immediately rather than waiting on this.
+        if len(track_points) < 2:
+            return
+        thumbnail_file_name = f"{record.id}_thumb.png"
+        destination = self.app.history_repository.directory / thumbnail_file_name
+
+        def on_done(success: bool) -> None:
+            if success:
+                self.app.history_repository.set_thumbnail(record.id, thumbnail_file_name)
+                self.window.ride_summary_view.on_thumbnail_ready(record.id, destination)
+
+        route_thumbnail_generator.generate(track_points, destination, on_done)
 
     def _open_workout_picker(self) -> None:
         dialog = Adw.Dialog(title="Choose Workout", content_width=360, content_height=420)

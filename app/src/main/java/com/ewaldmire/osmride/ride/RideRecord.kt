@@ -15,9 +15,12 @@ data class RideRecord(
     val routeName: String,
     val title: String = routeName,
     val notes: String = "",
-    /** Null for rides saved before this field existed, and for rides whose route was later
-     * deleted - either way, history falls back to a placeholder thumbnail. */
     val routeId: String? = null,
+    /** A snapshot of this ride's own recorded track - not the route's planning thumbnail, which
+     * can show a different shape if the rider stopped early or deviated. Generated once right
+     * after the ride is saved (see RideSummaryViewModel); null until that finishes, or for rides
+     * saved before this field existed. */
+    val thumbnailFileName: String? = null,
     val completedAtEpochMillis: Long,
     val distanceMeters: Double,
     val durationSeconds: Long,

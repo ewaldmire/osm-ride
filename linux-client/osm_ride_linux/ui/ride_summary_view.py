@@ -26,7 +26,8 @@ from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
 
 # Smaller than Routes'/History's 160x96 (same 5:3 aspect) - here it sits next to the name field
-# rather than owning a whole row/card to itself.
+# rather than owning a whole row/card to itself. A snapshot of this ride's own recorded track,
+# not the route's planning thumbnail - see ride_view.py's _generate_ride_thumbnail.
 _THUMBNAIL_DISPLAY_WIDTH = 120
 _THUMBNAIL_DISPLAY_HEIGHT = 72
 
@@ -46,7 +47,6 @@ class RideSummaryView(ToolbarPage):
         super().__init__()
         self.window = window
         self._repo = window.app.history_repository
-        self._route_repo = window.app.route_repository
         self._record: RideRecord | None = None
 
         self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Ride Complete")))
@@ -59,7 +59,9 @@ class RideSummaryView(ToolbarPage):
         outer.set_valign(Gtk.Align.START)
 
         # Lets the rider see the route they just rode before they save, rather than only seeing
-        # it later from History - same thumbnail file Routes/History already resolve, just smaller.
+        # it later from History. Not ready yet at this point - generation happens in the
+        # background after this screen shows (see on_thumbnail_ready) - so this starts as a
+        # placeholder, same as start() does for a ride whose thumbnail generation failed.
         header_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         self._thumbnail_container = Gtk.Box()
         header_row.append(self._thumbnail_container)
@@ -140,16 +142,7 @@ class RideSummaryView(ToolbarPage):
         buf = self._notes_view.get_buffer()
         buf.set_text(record.notes)
 
-        child = self._thumbnail_container.get_first_child()
-        if child is not None:
-            self._thumbnail_container.remove(child)
-        thumbnail = build_thumbnail_widget(
-            self._thumbnail_path(record),
-            _THUMBNAIL_DISPLAY_WIDTH,
-            _THUMBNAIL_DISPLAY_HEIGHT,
-            "document-open-recent-symbolic",
-        )
-        self._thumbnail_container.append(thumbnail)
+        self._set_thumbnail_widget(self._repo.thumbnail_path(record))
 
         self._stat_value_labels["distance"].set_text(units.format_miles(record.distance_meters))
         self._stat_value_labels["time"].set_text(units.format_duration(record.duration_seconds))
@@ -159,13 +152,21 @@ class RideSummaryView(ToolbarPage):
         self._stat_value_labels["avg_cadence"].set_text(units.format_cadence(record.avg_cadence_rpm))
         self._stat_value_labels["avg_heart_rate"].set_text(units.format_heart_rate(record.avg_heart_rate_bpm))
 
-    def _thumbnail_path(self, record: RideRecord) -> Path | None:
-        if record.route_id is None:
-            return None
-        summary = self._route_repo.get_route_summary(record.route_id)
-        if summary is None:
-            return None
-        return self._route_repo.thumbnail_path(summary)
+    def _set_thumbnail_widget(self, thumb_path: Path | None) -> None:
+        child = self._thumbnail_container.get_first_child()
+        if child is not None:
+            self._thumbnail_container.remove(child)
+        thumbnail = build_thumbnail_widget(
+            thumb_path, _THUMBNAIL_DISPLAY_WIDTH, _THUMBNAIL_DISPLAY_HEIGHT, "document-open-recent-symbolic"
+        )
+        self._thumbnail_container.append(thumbnail)
+
+    def on_thumbnail_ready(self, record_id: str, thumb_path: Path) -> None:
+        # Generation finishes asynchronously, after this screen may already be showing (see
+        # ride_view.py's _generate_ride_thumbnail) - only apply it if we're still displaying the
+        # same ride, not whatever's been shown here since.
+        if self._record is not None and self._record.id == record_id:
+            self._set_thumbnail_widget(thumb_path)
 
     def _on_done(self) -> None:
         if self._record is not None:

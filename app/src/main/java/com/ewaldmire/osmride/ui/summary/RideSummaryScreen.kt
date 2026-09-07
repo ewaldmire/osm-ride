@@ -52,7 +52,10 @@ fun RideSummaryScreen(
 
     var title by remember { mutableStateOf(viewModel.routeName) }
     var notes by remember { mutableStateOf("") }
-    val thumbnailFile = remember { viewModel.thumbnailFile() }
+    // Not available until generateThumbnail finishes in the background (see
+    // RideSummaryViewModel's init) - recomputed as savedRecord changes, so it appears as soon as
+    // it's ready instead of only on the next screen visit.
+    val thumbnailFile = savedRecord?.let { viewModel.thumbnailFile(it) }
     val bitmap = remember(thumbnailFile) {
         thumbnailFile?.let { file -> BitmapFactory.decodeFile(file.path)?.asImageBitmap() }
     }

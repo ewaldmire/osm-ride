@@ -26,22 +26,24 @@ private const val ROUTE_SOURCE_ID = "thumbnail-route"
 private const val ROUTE_LAYER_ID = "thumbnail-route-line"
 
 /**
- * Renders a small cached MapLibre snapshot of a route's shape, generated once at import/edit
- * time rather than redrawn on every list render (see RouteSummary.thumbnailFileName). Uses
- * MapSnapshotter - MapLibre's built-in headless/static rendering path, the same library
- * BikeMapView.kt uses for the live ride map - rather than a visible MapView. The route line is
- * baked into the style via a Style.Builder (the same GeoJsonSource/LineLayer construction
- * BikeMapView.kt uses) rather than a plain style URL, so the snapshot shows the route, not just
- * bare terrain.
+ * Renders a small cached MapLibre snapshot of a line's shape - either a route's planned path
+ * (generated once at import/edit time, see RouteSummary.thumbnailFileName) or a completed ride's
+ * actual recorded track (see RideRecord.thumbnailFileName), which can differ from the route if
+ * the rider stopped early or deviated. Takes plain points rather than a Route, since that's all
+ * either caller has in common. Uses MapSnapshotter - MapLibre's built-in headless/static
+ * rendering path, the same library BikeMapView.kt uses for the live ride map - rather than a
+ * visible MapView. The route line is baked into the style via a Style.Builder (the same
+ * GeoJsonSource/LineLayer construction BikeMapView.kt uses) rather than a plain style URL, so the
+ * snapshot shows the line, not just bare terrain.
  */
 object RouteThumbnailGenerator {
-    suspend fun generate(context: Context, route: Route, destination: File): Boolean {
-        if (route.points.size < 2) return false
+    suspend fun generate(context: Context, points: List<LatLng>, destination: File): Boolean {
+        if (points.size < 2) return false
 
         val boundsBuilder = LatLngBounds.Builder()
-        route.points.forEach { boundsBuilder.include(LatLng(it.lat, it.lon)) }
+        points.forEach { boundsBuilder.include(it) }
 
-        val routeLine = LineString.fromLngLats(route.points.map { Point.fromLngLat(it.lon, it.lat) })
+        val routeLine = LineString.fromLngLats(points.map { Point.fromLngLat(it.longitude, it.latitude) })
         val styleBuilder = Style.Builder()
             .fromUri(ThreeDMapStyle.STYLE_URI)
             .withSource(GeoJsonSource(ROUTE_SOURCE_ID, Feature.fromGeometry(routeLine)))

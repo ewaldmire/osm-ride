@@ -64,11 +64,31 @@ class RideHistoryRepository:
     def gpx_file(self, record: RideRecord) -> Path:
         return self._rides_dir / record.gpx_file_name
 
+    def set_thumbnail(self, ride_id: str, thumbnail_file_name: str) -> None:
+        """Called once route_thumbnail_generator finishes snapshotting this ride's own recorded
+        track - never blocks save_ride, since generation happens asynchronously afterward."""
+        updated = [
+            replace(r, thumbnail_file_name=thumbnail_file_name) if r.id == ride_id else r for r in self.rides
+        ]
+        self._update_rides(updated)
+
+    def thumbnail_path(self, record: RideRecord) -> Path | None:
+        if record.thumbnail_file_name is None:
+            return None
+        return self._rides_dir / record.thumbnail_file_name
+
+    @property
+    def directory(self) -> Path:
+        return self._rides_dir
+
     def delete_ride(self, ride_id: str) -> None:
         record = next((r for r in self.rides if r.id == ride_id), None)
         if record is None:
             return
         (self._rides_dir / record.gpx_file_name).unlink(missing_ok=True)
+        thumb_path = self.thumbnail_path(record)
+        if thumb_path is not None:
+            thumb_path.unlink(missing_ok=True)
         self._update_rides([r for r in self.rides if r.id != ride_id])
 
     def _update_rides(self, updated: list[RideRecord]) -> None:

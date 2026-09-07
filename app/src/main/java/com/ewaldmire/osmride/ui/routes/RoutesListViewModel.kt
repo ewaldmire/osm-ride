@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 
 class RoutesListViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as OsmRideApp
@@ -41,7 +42,8 @@ class RoutesListViewModel(application: Application) : AndroidViewModel(applicati
             val route = repository.loadRoute(summary.id) ?: return@launch
             val fileName = "${summary.id}_thumb.png"
             val destination = File(repository.directory, fileName)
-            if (RouteThumbnailGenerator.generate(app, route, destination)) {
+            val points = route.points.map { LatLng(it.lat, it.lon) }
+            if (RouteThumbnailGenerator.generate(app, points, destination)) {
                 repository.setThumbnail(summary.id, fileName)
             }
         }

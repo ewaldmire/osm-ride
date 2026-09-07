@@ -116,9 +116,12 @@ class RideRecord:
     title: str | None = None
     notes: str = ""
     estimated_kilocalories: float | None = None
-    # None for rides saved before this field existed, and for rides whose route was later
-    # deleted - either way, history falls back to a placeholder thumbnail.
     route_id: str | None = None
+    # A snapshot of this ride's own recorded track, not the route's planning thumbnail - those
+    # can differ if the rider stopped early or deviated. Generated once right after the ride is
+    # saved (see ride_view.py's _on_ride_finished); None until that finishes, or for rides saved
+    # before this field existed.
+    thumbnail_file_name: str | None = None
 
     def __post_init__(self) -> None:
         if self.title is None:
