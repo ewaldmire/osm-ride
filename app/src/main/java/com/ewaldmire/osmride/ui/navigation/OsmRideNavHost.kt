@@ -24,11 +24,18 @@ import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
 import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
 
 /** The persistent bottom bar (see [OsmRideBottomBar]) lives on this single outer Scaffold, not
- * on each screen - every screen still keeps its own Scaffold+TopAppBar for its back arrow/title,
- * nested inside this one's content slot. The two don't fight over padding: this Scaffold only
- * ever contributes bottom padding (the bar), each inner Scaffold only ever contributes top
- * padding (its own top bar), so nesting them is safe. Hidden only on [Destinations.RIDE] - the
- * map needs the full viewport while riding. */
+ * on each screen - every screen still keeps its own Scaffold+TopAppBar for its title, nested
+ * inside this one's content slot. The two don't fight over padding: this Scaffold only ever
+ * contributes bottom padding (the bar), each inner Scaffold only ever contributes top padding
+ * (its own top bar), so nesting them is safe. Hidden only on [Destinations.RIDE] - the map needs
+ * the full viewport while riding.
+ *
+ * Only genuine sub-pages (Route Creator, Workout Creator, Pairing) get a back arrow in their
+ * TopAppBar. The four bottom-nav root tabs (History, Routes, Workouts, Settings) don't - they're
+ * reached only via the bottom bar, so a "back" affordance on them was both redundant with it and,
+ * worse, always landed on History regardless of which tab the user actually came from (the
+ * bottom bar's popUpTo(HISTORY) reset below means popBackStack() on a root tab always resolves
+ * to History, not whatever tab preceded it). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
@@ -65,7 +72,6 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                     onEditRoute = { routeId, showDerivedHint ->
                         navController.navigate(Destinations.routeCreatorEdit(routeId, showDerivedHint))
                     },
-                    onBack = { navController.popBackStack() },
                 )
             }
             composable(
@@ -91,13 +97,11 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             }
             composable(Destinations.SETTINGS) {
                 SettingsScreen(
-                    onBack = { navController.popBackStack() },
                     onOpenPairing = { navController.navigate(Destinations.PAIRING) },
                 )
             }
             composable(Destinations.WORKOUTS_LIST) {
                 WorkoutsListScreen(
-                    onBack = { navController.popBackStack() },
                     onCreateWorkout = { navController.navigate(Destinations.WORKOUT_CREATOR_NEW) },
                     onEditWorkout = { workoutId -> navController.navigate(Destinations.workoutCreatorEdit(workoutId)) },
                 )

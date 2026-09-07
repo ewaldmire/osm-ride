@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
@@ -67,7 +66,6 @@ fun RoutesListScreen(
     onRouteSelected: (String) -> Unit,
     onCreateRoute: () -> Unit,
     onEditRoute: (routeId: String, showDerivedHint: Boolean) -> Unit,
-    onBack: () -> Unit,
     viewModel: RoutesListViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -100,11 +98,6 @@ fun RoutesListScreen(
                             "Create a route or import a GPX file, then tap it to start riding",
                             style = MaterialTheme.typography.bodySmall,
                         )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
