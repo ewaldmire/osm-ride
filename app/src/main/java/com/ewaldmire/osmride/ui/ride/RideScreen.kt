@@ -72,6 +72,7 @@ fun RideScreen(
     routeId: String,
     onFinished: () -> Unit,
     onOpenPairing: () -> Unit,
+    onCancel: () -> Unit,
     viewModel: RideViewModel = viewModel(),
 ) {
     LaunchedEffect(routeId) { viewModel.loadRoute(routeId) }
@@ -193,6 +194,7 @@ fun RideScreen(
                 isLandscape = isLandscape,
                 viewModel = viewModel,
                 onChooseWorkout = { showWorkoutPicker = true },
+                onCancel = onCancel,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .navigationBarsPadding()
@@ -220,6 +222,7 @@ fun RideScreen(
                 isLandscape = isLandscape,
                 viewModel = viewModel,
                 onChooseWorkout = { showWorkoutPicker = true },
+                onCancel = onCancel,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
@@ -335,6 +338,7 @@ private fun ActionCard(
     isLandscape: Boolean,
     viewModel: RideViewModel,
     onChooseWorkout: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -353,12 +357,17 @@ private fun ActionCard(
                 }
             }
         }
-        RideActionButtons(state = stats.state, isLandscape = isLandscape, viewModel = viewModel)
+        RideActionButtons(state = stats.state, isLandscape = isLandscape, viewModel = viewModel, onCancel = onCancel)
     }
 }
 
 @Composable
-private fun RideActionButtons(state: RideState, isLandscape: Boolean, viewModel: RideViewModel) {
+private fun RideActionButtons(
+    state: RideState,
+    isLandscape: Boolean,
+    viewModel: RideViewModel,
+    onCancel: () -> Unit,
+) {
     if (isLandscape) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -366,6 +375,13 @@ private fun RideActionButtons(state: RideState, isLandscape: Boolean, viewModel:
         ) {
             when (state) {
                 RideState.IDLE -> {
+                    // Nothing's been recorded yet at this point, so cancelling just leaves - no
+                    // Finish/save step needed, unlike RIDING/PAUSED below. This is also the ride
+                    // screen's only way back at all before the trip actually starts (no back
+                    // arrow otherwise - see RideScreen's docs).
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                        Text("Cancel")
+                    }
                     Button(onClick = viewModel::start, modifier = Modifier.fillMaxWidth()) {
                         Text("Start Ride")
                     }
@@ -396,6 +412,9 @@ private fun RideActionButtons(state: RideState, isLandscape: Boolean, viewModel:
         ) {
             when (state) {
                 RideState.IDLE -> {
+                    OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                        Text("Cancel")
+                    }
                     Button(onClick = viewModel::start, modifier = Modifier.weight(1f)) {
                         Text("Start Ride")
                     }

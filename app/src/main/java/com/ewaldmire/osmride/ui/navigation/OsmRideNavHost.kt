@@ -139,6 +139,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                             }
                         },
                         onOpenPairing = { navController.navigate(Destinations.PAIRING) },
+                        onCancel = { navController.popBackStack() },
                     )
                 }
             }
