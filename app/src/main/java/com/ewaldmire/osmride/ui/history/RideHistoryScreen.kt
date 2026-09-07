@@ -77,7 +77,7 @@ fun RideHistoryScreen(viewModel: RideHistoryViewModel = viewModel()) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("OSM Ride") })
+            TopAppBar(title = { Text("History") })
         },
     ) { padding ->
         if (rides.isEmpty()) {

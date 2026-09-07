@@ -35,7 +35,7 @@ class HistoryView(ToolbarPage):
         self._repo = window.app.history_repository
         self._route_repo = window.app.route_repository
 
-        self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="OSM Ride")))
+        self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="History")))
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         outer.set_margin_top(16)
