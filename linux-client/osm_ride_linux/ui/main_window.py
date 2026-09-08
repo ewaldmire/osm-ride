@@ -27,6 +27,7 @@ from .ride_view import RideView
 from .route_creator_view import RouteCreatorView
 from .routes_view import RoutesView
 from .settings_view import SettingsView
+from .weight_view import WeightView
 from .workout_creator_view import WorkoutCreatorView
 from .workouts_view import WorkoutsView
 
@@ -55,6 +56,9 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.pairing_view = PairingView(self)
         self.stack.add_named(self.pairing_view, "pairing")
+
+        self.weight_view = WeightView(self)
+        self.stack.add_named(self.weight_view, "weight")
 
         self.ride_view = RideView(self)
         self.stack.add_named(self.ride_view, "ride")
@@ -96,6 +100,9 @@ class MainWindow(Adw.ApplicationWindow):
         # in-progress ride rather than Settings - can override where the back button goes.
         self.pairing_view.on_back = on_back or self.show_settings
         self.stack.set_visible_child_name("pairing")
+
+    def show_weight(self) -> None:
+        self.stack.set_visible_child_name("weight")
 
     def show_routes(self) -> None:
         self.stack.set_visible_child_name("routes")

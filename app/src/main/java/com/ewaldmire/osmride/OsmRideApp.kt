@@ -10,6 +10,7 @@ import com.ewaldmire.osmride.ride.RideForegroundService
 import com.ewaldmire.osmride.ride.RideHistoryRepository
 import com.ewaldmire.osmride.ride.WorkoutRepository
 import com.ewaldmire.osmride.route.RouteRepository
+import com.ewaldmire.osmride.weight.WeightRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,7 @@ class OsmRideApp : Application() {
     val routeRepository: RouteRepository by lazy { RouteRepository(this) }
     val rideHistoryRepository: RideHistoryRepository by lazy { RideHistoryRepository(this) }
     val workoutRepository: WorkoutRepository by lazy { WorkoutRepository(this) }
+    val weightRepository: WeightRepository by lazy { WeightRepository(this) }
 
     private val _currentRideEngine = MutableStateFlow<RideEngine?>(null)
     val currentRideEngineFlow: StateFlow<RideEngine?> = _currentRideEngine.asStateFlow()

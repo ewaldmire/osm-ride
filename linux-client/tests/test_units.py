@@ -20,3 +20,7 @@ def test_format_watts_none_is_dashes():
 def test_format_grade_shows_sign():
     assert units.format_grade(3.2) == "+3.2%"
     assert units.format_grade(-1.5) == "-1.5%"
+
+
+def test_format_weight_lbs():
+    assert units.format_weight_lbs(1.0) == "2.2 lb"

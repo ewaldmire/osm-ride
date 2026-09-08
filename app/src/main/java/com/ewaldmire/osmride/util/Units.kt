@@ -7,10 +7,13 @@ object Units {
     private const val METERS_PER_MILE = 1609.344
     private const val METERS_PER_FOOT = 0.3048
     private const val MPS_TO_MPH = 2.2369362921
+    private const val LB_PER_KG = 2.2046226218
 
     fun metersToMiles(meters: Double): Double = meters / METERS_PER_MILE
     fun metersToFeet(meters: Double): Double = meters / METERS_PER_FOOT
     fun mpsToMph(metersPerSecond: Double): Double = metersPerSecond * MPS_TO_MPH
+    fun kgToLbs(kg: Double): Double = kg * LB_PER_KG
+    fun lbsToKg(lbs: Double): Double = lbs / LB_PER_KG
 
     fun formatMiles(meters: Double): String = String.format(Locale.US, "%.2f mi", metersToMiles(meters))
     fun formatFeet(meters: Double): String = String.format(Locale.US, "%.0f ft", metersToFeet(meters))
@@ -23,6 +26,7 @@ object Units {
         if (percent == null) "--" else String.format(Locale.US, "%+.1f%%", percent)
     fun formatKilocalories(kcal: Double?): String =
         if (kcal == null) "--" else String.format(Locale.US, "%.0f Cal", kcal)
+    fun formatWeightLbs(kg: Double): String = String.format(Locale.US, "%.1f lb", kgToLbs(kg))
 
     fun formatDuration(totalSeconds: Long): String {
         val h = totalSeconds / 3600

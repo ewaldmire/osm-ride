@@ -21,6 +21,7 @@ import com.ewaldmire.osmride.ui.routes.RoutesListScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
 import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
+import com.ewaldmire.osmride.ui.weight.WeightScreen
 import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
 
 /** The persistent bottom bar (see [OsmRideBottomBar]) lives on this single outer Scaffold, not
@@ -98,7 +99,11 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             composable(Destinations.SETTINGS) {
                 SettingsScreen(
                     onOpenPairing = { navController.navigate(Destinations.PAIRING) },
+                    onOpenWeight = { navController.navigate(Destinations.WEIGHT) },
                 )
+            }
+            composable(Destinations.WEIGHT) {
+                WeightScreen(onBack = { navController.popBackStack() })
             }
             composable(Destinations.WORKOUTS_LIST) {
                 WorkoutsListScreen(

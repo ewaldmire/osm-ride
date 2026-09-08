@@ -8,6 +8,7 @@ from __future__ import annotations
 _METERS_PER_MILE = 1609.344
 _METERS_PER_FOOT = 0.3048
 _MPS_TO_MPH = 2.2369362921
+_LB_PER_KG = 2.2046226218
 
 
 def meters_to_miles(meters: float) -> float:
@@ -20,6 +21,14 @@ def meters_to_feet(meters: float) -> float:
 
 def mps_to_mph(meters_per_second: float) -> float:
     return meters_per_second * _MPS_TO_MPH
+
+
+def kg_to_lbs(kg: float) -> float:
+    return kg * _LB_PER_KG
+
+
+def lbs_to_kg(lbs: float) -> float:
+    return lbs / _LB_PER_KG
 
 
 def format_miles(meters: float) -> str:
@@ -52,6 +61,10 @@ def format_grade(percent: float | None) -> str:
 
 def format_kilocalories(kcal: float | None) -> str:
     return "--" if kcal is None else f"{kcal:.0f} Cal"
+
+
+def format_weight_lbs(kg: float) -> str:
+    return f"{kg_to_lbs(kg):.1f} lb"
 
 
 def format_duration(total_seconds: float) -> str:
