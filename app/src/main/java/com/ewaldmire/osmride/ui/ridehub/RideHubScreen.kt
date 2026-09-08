@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -76,7 +77,19 @@ fun RideHubScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Ride") },
+                    title = {
+                        Column {
+                            Text("Ride")
+                            Text(
+                                if (selectedTab == RideHubTab.Routes) {
+                                    "Create a route or import a GPX file, then tap it to start riding"
+                                } else {
+                                    "Review your completed rides and stats"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    },
                     actions = {
                         if (selectedTab == RideHubTab.Routes) {
                             // Text actions, not icon-only - a bare icon pair reads as "hard to

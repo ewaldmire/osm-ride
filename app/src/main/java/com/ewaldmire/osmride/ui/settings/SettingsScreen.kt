@@ -27,7 +27,17 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(onOpenPairing: () -> Unit) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Settings") })
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Settings")
+                        Text(
+                            "Manage device connections and app configuration",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+            )
         },
     ) { padding ->
         Column(

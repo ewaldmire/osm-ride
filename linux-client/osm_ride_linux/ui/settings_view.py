@@ -18,7 +18,13 @@ class SettingsView(ToolbarPage):
         super().__init__()
         self.window = window
 
-        self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Settings")))
+        self.add_top_bar(
+            Adw.HeaderBar(
+                title_widget=Adw.WindowTitle(
+                    title="Settings", subtitle="Manage device connections and app configuration"
+                )
+            )
+        )
 
         page = Adw.PreferencesPage()
 

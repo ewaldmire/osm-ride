@@ -26,7 +26,13 @@ class ProfileView(ToolbarPage):
         self._weight_repo = window.app.weight_repository
         app = window.app
 
-        self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Profile")))
+        self.add_top_bar(
+            Adw.HeaderBar(
+                title_widget=Adw.WindowTitle(
+                    title="Profile", subtitle="Personal info used to tailor your training"
+                )
+            )
+        )
 
         page = Adw.PreferencesPage()
 

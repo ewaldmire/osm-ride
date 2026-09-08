@@ -53,7 +53,17 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Profile") })
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Profile")
+                        Text(
+                            "Personal info used to tailor your training",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+            )
         },
     ) { padding ->
         Column(
