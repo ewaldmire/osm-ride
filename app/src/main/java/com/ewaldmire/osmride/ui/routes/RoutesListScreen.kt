@@ -2,10 +2,6 @@ package com.ewaldmire.osmride.ui.routes
 
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.Uri
-import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,19 +24,12 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -53,117 +42,80 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.RideEngine
 import com.ewaldmire.osmride.route.RouteSummary
 import com.ewaldmire.osmride.util.Units
 import java.io.File
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Body content only, no Scaffold/TopAppBar of its own - embedded inside RideHubScreen alongside
+ * RideHistoryContent under one shared top bar (with a Routes/History tab row and, only while
+ * this tab is active, the Create/Import actions). See RideHubScreen.kt.
+ */
 @Composable
-fun RoutesListScreen(
+fun RoutesListContent(
+    padding: PaddingValues,
+    viewModel: RoutesListViewModel,
+    snackbarHostState: SnackbarHostState,
     onRouteSelected: (String) -> Unit,
-    onCreateRoute: () -> Unit,
     onEditRoute: (routeId: String, showDerivedHint: Boolean) -> Unit,
-    viewModel: RoutesListViewModel = viewModel(),
 ) {
     val context = LocalContext.current
     val routes by viewModel.routes.collectAsState()
-    val importError by viewModel.importError.collectAsState()
     val activeRideEngine by viewModel.activeRideEngine.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) {
-            viewModel.importGpx(uri, queryDisplayName(uri, context))
-        }
-    }
-
-    LaunchedEffect(importError) {
-        importError?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearImportError()
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("New Ride")
-                        Text(
-                            "Create a route or import a GPX file, then tap it to start riding",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                },
-                actions = {
-                    // Text actions, not icon-only - a bare AddRoad/UploadFile icon pair reads as
-                    // "hard to tell what they do" (confirmed by the user) once there's no FAB
-                    // label next to it. Matches Linux's labeled "Create Route…"/"Import GPX…"
-                    // header bar buttons, not just moved to fix the FAB overlapping the last
-                    // route card's edit/delete icons.
-                    TextButton(onClick = onCreateRoute) { Text("Create") }
-                    TextButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
-                },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
-    ) { padding ->
-        fun selectRoute(routeId: String) {
-            val active = activeRideEngine
-            if (active != null && active.route.id != routeId) {
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Finish your current ride first")
-                }
-            } else {
-                onRouteSelected(routeId)
+    fun selectRoute(routeId: String) {
+        val active = activeRideEngine
+        if (active != null && active.route.id != routeId) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Finish your current ride first")
             }
-        }
-
-        if (routes.isEmpty()) {
-            EmptyState(padding)
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                activeRideEngine?.let { active ->
-                    item(key = "active-ride-banner") {
-                        ActiveRideBanner(engine = active, onClick = { selectRoute(active.route.id) })
-                    }
+            onRouteSelected(routeId)
+        }
+    }
+
+    if (routes.isEmpty()) {
+        EmptyState(padding)
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            activeRideEngine?.let { active ->
+                item(key = "active-ride-banner") {
+                    ActiveRideBanner(engine = active, onClick = { selectRoute(active.route.id) })
                 }
-                items(routes, key = { it.id }) { route ->
-                    RouteCard(
-                        route = route,
-                        thumbnailFile = viewModel.thumbnailFile(route),
-                        onClick = { selectRoute(route.id) },
-                        onEdit = {
-                            viewModel.prepareEdit(route.id) { showDerivedHint ->
-                                onEditRoute(route.id, showDerivedHint)
-                            }
-                        },
-                        onExport = {
-                            val file = viewModel.routeFile(route)
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                file,
-                            )
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/gpx+xml"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Export route"))
-                        },
-                        onDelete = { viewModel.deleteRoute(route.id) },
-                    )
-                }
+            }
+            items(routes, key = { it.id }) { route ->
+                RouteCard(
+                    route = route,
+                    thumbnailFile = viewModel.thumbnailFile(route),
+                    onClick = { selectRoute(route.id) },
+                    onEdit = {
+                        viewModel.prepareEdit(route.id) { showDerivedHint ->
+                            onEditRoute(route.id, showDerivedHint)
+                        }
+                    },
+                    onExport = {
+                        val file = viewModel.routeFile(route)
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
+                        )
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/gpx+xml"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Export route"))
+                    },
+                    onDelete = { viewModel.deleteRoute(route.id) },
+                )
             }
         }
     }
@@ -194,7 +146,7 @@ private fun EmptyState(padding: PaddingValues) {
     ) {
         Icon(Icons.Filled.DirectionsBike, contentDescription = null)
         Text(
-            "No routes yet. Use the buttons above to create or import one.",
+            "No routes yet. Create a route or import a GPX file, then tap it to start riding.",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(top = 12.dp),
         )
@@ -282,14 +234,4 @@ private fun RouteCard(
             }
         }
     }
-}
-
-private fun queryDisplayName(uri: Uri, context: android.content.Context): String? {
-    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (index >= 0 && cursor.moveToFirst()) {
-            return cursor.getString(index)?.substringBeforeLast(".")
-        }
-    }
-    return null
 }

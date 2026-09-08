@@ -1,5 +1,9 @@
 """Mirrors app/src/main/java/com/ewaldmire/osmride/ui/routes/RoutesListScreen.kt: import GPX,
 build routes in-app via BRouter, list routes with distance/climb, rename/delete, tap to ride.
+
+Content only, no header bar of its own - embedded inside RideHubView alongside HistoryView under
+one shared header (with a Routes/History switcher and, only while this tab is active, the
+Create/Import actions). See ride_hub_view.py.
 """
 
 from __future__ import annotations
@@ -18,7 +22,6 @@ from ..route.repository import RouteRepositoryError  # noqa: E402
 from ..util import units  # noqa: E402
 from . import route_thumbnail_generator  # noqa: E402
 from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
-from .toolbar_page import ToolbarPage  # noqa: E402
 
 # Same 5:3 aspect ratio as the generated PNG (see route_thumbnail_generator.py's
 # _THUMBNAIL_WIDTH/_THUMBNAIL_HEIGHT) so the display scale is uniform, not stretched.
@@ -26,24 +29,11 @@ _THUMBNAIL_DISPLAY_WIDTH = 160
 _THUMBNAIL_DISPLAY_HEIGHT = 96
 
 
-class RoutesView(ToolbarPage):
+class RoutesView(Gtk.Box):
     def __init__(self, window) -> None:  # noqa: ANN001 - MainWindow, avoiding an import cycle
-        super().__init__()
+        super().__init__(hexpand=True, vexpand=True)
         self.window = window
         self._repo = window.app.route_repository
-
-        header = Adw.HeaderBar(
-            title_widget=Adw.WindowTitle(
-                title="New Ride", subtitle="Create a route or import a GPX file, then tap it to start riding"
-            )
-        )
-        create_button = Gtk.Button(label="Create Route…")
-        create_button.connect("clicked", lambda _b: window.show_route_creator_new())
-        import_button = Gtk.Button(label="Import GPX…")
-        import_button.connect("clicked", self._on_import_clicked)
-        header.pack_end(create_button)
-        header.pack_end(import_button)
-        self.add_top_bar(header)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         outer.set_margin_top(16)
@@ -54,7 +44,7 @@ class RoutesView(ToolbarPage):
 
         self._empty_status = Adw.StatusPage(
             title="No routes yet",
-            description="Import a GPX file or create one with the route builder.",
+            description="Import a GPX file or create one with the route builder, then tap it to start riding.",
             icon_name="mark-location-symbolic",
         )
         self._routes_group = Adw.PreferencesGroup()
@@ -63,9 +53,9 @@ class RoutesView(ToolbarPage):
         outer.append(self._empty_status)
         outer.append(self._routes_group)
 
-        scroller = Gtk.ScrolledWindow()
+        scroller = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         scroller.set_child(outer)
-        self.set_content(scroller)
+        self.append(scroller)
 
         self._repo.on_routes_changed = lambda _routes: self.refresh()
         self.refresh()
@@ -153,7 +143,7 @@ class RoutesView(ToolbarPage):
         except OSError as e:
             self._show_error(f"Could not export route: {e}")
 
-    def _on_import_clicked(self, _button: Gtk.Button) -> None:
+    def import_route(self) -> None:
         dialog = Gtk.FileDialog(title="Import GPX Route")
         gpx_filter = Gtk.FileFilter()
         gpx_filter.set_name("GPX files")

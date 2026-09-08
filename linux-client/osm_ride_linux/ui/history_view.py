@@ -1,6 +1,7 @@
-"""Home screen: ride history list + overview stats. The four-tab switcher bar (History/Routes/
-Workouts/Settings) lives at the MainWindow level (see main_window.py's Adw.ViewSwitcherBar), not
-here.
+"""Ride history list + overview stats.
+
+Content only, no header bar of its own - embedded inside RideHubView alongside RoutesView under
+one shared header (with a Routes/History switcher). See ride_hub_view.py.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/history/RideHistoryScreen.kt.
 """
@@ -19,7 +20,6 @@ from gi.repository import Adw, Gio, Gtk  # noqa: E402
 from ..ride.models import RideRecord  # noqa: E402
 from ..util import units  # noqa: E402
 from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
-from .toolbar_page import ToolbarPage  # noqa: E402
 
 # Same 5:3 aspect/size as RoutesView's thumbnails (see routes_view.py) - a snapshot of each ride's
 # own recorded track, not the route's planning thumbnail (see ride_view.py's
@@ -28,19 +28,11 @@ _THUMBNAIL_DISPLAY_WIDTH = 160
 _THUMBNAIL_DISPLAY_HEIGHT = 96
 
 
-class HistoryView(ToolbarPage):
+class HistoryView(Gtk.Box):
     def __init__(self, window) -> None:  # noqa: ANN001 - MainWindow, avoiding an import cycle
-        super().__init__()
+        super().__init__(hexpand=True, vexpand=True)
         self.window = window
         self._repo = window.app.history_repository
-
-        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="History"))
-        # Weight tracking isn't app configuration, so it doesn't belong in Settings - it lives
-        # here instead, alongside the rest of the rider's personal record.
-        weight_button = Gtk.Button(icon_name="osm-ride-scale-symbolic", tooltip_text="Weight Tracking")
-        weight_button.connect("clicked", lambda _b: window.show_weight())
-        header.pack_end(weight_button)
-        self.add_top_bar(header)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         outer.set_margin_top(16)
@@ -59,9 +51,9 @@ class HistoryView(ToolbarPage):
         outer.append(self._overview_group)
         outer.append(self._rides_group)
 
-        scroller = Gtk.ScrolledWindow()
+        scroller = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         scroller.set_child(outer)
-        self.set_content(scroller)
+        self.append(scroller)
 
         # RideHistoryRepository does all its work synchronously on whatever thread calls it
         # (plain local file I/O, no BLE/network involved), and every call into it here comes

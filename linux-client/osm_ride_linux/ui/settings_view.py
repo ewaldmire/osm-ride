@@ -1,5 +1,6 @@
-"""Mirrors app/src/main/java/com/ewaldmire/osmride/ui/settings/SettingsScreen.kt: a Bluetooth
-Devices row (-> pairing) and the FTP field. Workout Library isn't here - it's a bottom tab now."""
+"""Mirrors app/src/main/java/com/ewaldmire/osmride/ui/settings/SettingsScreen.kt: just app
+configuration (Bluetooth pairing). Personal "about you" data (FTP, weight) lives on Profile
+instead - see profile_view.py."""
 
 from __future__ import annotations
 
@@ -16,7 +17,6 @@ class SettingsView(ToolbarPage):
     def __init__(self, window) -> None:  # noqa: ANN001 - MainWindow, avoiding an import cycle
         super().__init__()
         self.window = window
-        app = window.app
 
         self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Settings")))
 
@@ -33,23 +33,4 @@ class SettingsView(ToolbarPage):
         devices_group.add(pairing_row)
         page.add(devices_group)
 
-        training_group = Adw.PreferencesGroup(
-            title="Training",
-            description="Needed to convert %FTP-based .mrc/.zwo workouts to watts",
-        )
-        self._ftp_row = Adw.EntryRow(title="FTP (watts)")
-        current_ftp = app.prefs.get_ftp_watts()
-        if current_ftp is not None:
-            self._ftp_row.set_text(str(current_ftp))
-        self._ftp_row.connect("changed", self._on_ftp_changed)
-        training_group.add(self._ftp_row)
-        page.add(training_group)
-
         self.set_content(page)
-
-    def _on_ftp_changed(self, entry: Adw.EntryRow) -> None:
-        digits = "".join(c for c in entry.get_text() if c.isdigit())
-        if digits != entry.get_text():
-            entry.set_text(digits)
-            return  # setting text re-triggers "changed"; let the recursive call save it
-        self.window.app.prefs.set_ftp_watts(int(digits) if digits else None)

@@ -1,12 +1,13 @@
 package com.ewaldmire.osmride.ui.navigation
 
 object Destinations {
-    const val ROUTES_LIST = "routes_list"
     const val PAIRING = "pairing"
     const val RIDE = "ride/{routeId}"
     const val SUMMARY = "summary"
-    /** Home screen: ride history + overview, with New Ride / Settings in its bottom bar. */
-    const val HISTORY = "history"
+    /** Home screen: Routes + History combined behind a tab switcher (see RideHubScreen.kt) -
+     * distinct from [RIDE], the live-riding map screen. */
+    const val RIDE_HUB = "ride_hub"
+    const val PROFILE = "profile"
     const val SETTINGS = "settings"
     const val WORKOUTS_LIST = "workouts_list"
     const val ROUTE_CREATOR = "route_creator?routeId={routeId}&showDerivedHint={showDerivedHint}"

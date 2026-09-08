@@ -1,13 +1,19 @@
 """Top-level window: an Adw.ViewStack switches between full-screen views, with libadwaita's
 built-in Adw.ViewSwitcherBar as the persistent bottom tab bar - hidden only on "ride" (the map
-needs the full window while riding). Only the four tab screens (History/Routes/Workouts/
-Settings) are added with add_titled_with_icon() so they get a switcher button; sub-screens
-(Pairing, Ride, the two Creators) are added with add_named() so the stack can navigate to them
+needs the full window while riding). Only the four tab screens (Profile/Ride/Workouts/Settings)
+are added with add_titled_with_icon() so they get a switcher button; sub-screens (Pairing,
+Weight, Ride, the two Creators) are added with add_named() so the stack can navigate to them
 without the switcher ever showing a button - and without highlighting any tab - for them, mirroring
 the "no tab active on sub-screens" behavior the GTK3 version's custom bar had.
 
+"Ride" (add_titled "ride_hub") combines the old separate History/Routes tabs behind one Routes/
+History switcher (see ride_hub_view.py) - both are "things you do with your rides", not two
+distinct app areas. "Profile" (FTP + weight, see profile_view.py) replaced History as a top-level
+tab - that's personal "about you" data, not app configuration, so it doesn't belong in Settings
+either.
+
 Simpler than Android Navigation's back-stack - GTK apps don't have a system back button to wire
-up, and every screen here can always get back to history via the switcher bar, so a flat
+up, and every screen here can always get back to the hub via the switcher bar, so a flat
 named-page stack is enough."""
 
 from __future__ import annotations
@@ -20,12 +26,12 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw  # noqa: E402
 
-from .history_view import HistoryView
 from .pairing_view import PairingView
+from .profile_view import ProfileView
+from .ride_hub_view import RideHubView
 from .ride_summary_view import RideSummaryView
 from .ride_view import RideView
 from .route_creator_view import RouteCreatorView
-from .routes_view import RoutesView
 from .settings_view import SettingsView
 from .weight_view import WeightView
 from .workout_creator_view import WorkoutCreatorView
@@ -39,14 +45,13 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.stack = Adw.ViewStack()
 
-        self.history_view = HistoryView(self)
-        self.stack.add_titled_with_icon(self.history_view, "history", "History", "document-open-recent-symbolic")
+        self.profile_view = ProfileView(self)
+        self.stack.add_titled_with_icon(self.profile_view, "profile", "Profile", "avatar-default-symbolic")
 
-        self.routes_view = RoutesView(self)
-        # "Ride" (not "Routes") - this tab is the primary way to start riding, not a separate
-        # browsing library; it's the same route list/create/import screen, just reframed as an
-        # action, matching Android's OsmRideBottomBar.kt.
-        self.stack.add_titled_with_icon(self.routes_view, "routes", "Ride", "osm-ride-bike-symbolic")
+        self.ride_hub_view = RideHubView(self)
+        # "Ride" (not "Routes"/"History") - this tab is the primary way to start riding or review
+        # past ones, matching Android's OsmRideBottomBar.kt.
+        self.stack.add_titled_with_icon(self.ride_hub_view, "ride_hub", "Ride", "osm-ride-bike-symbolic")
 
         self.workouts_view = WorkoutsView(self)
         self.stack.add_titled_with_icon(self.workouts_view, "workouts", "Workout", "osm-ride-dumbbell-symbolic")
@@ -82,14 +87,15 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(toolbar_view)
 
         self.stack.connect("notify::visible-child-name", self._on_page_changed)
-        self.stack.set_visible_child_name("history")
+        self.stack.set_visible_child_name("ride_hub")
 
     def _on_page_changed(self, _stack: Adw.ViewStack, _pspec) -> None:  # noqa: ANN001
         name = self.stack.get_visible_child_name()
         self.view_switcher_bar.set_reveal(name != "ride")
 
-    def show_history(self) -> None:
-        self.stack.set_visible_child_name("history")
+    def show_profile(self) -> None:
+        self.profile_view.refresh_weight_summary()
+        self.stack.set_visible_child_name("profile")
 
     def show_settings(self) -> None:
         self.stack.set_visible_child_name("settings")
@@ -101,11 +107,20 @@ class MainWindow(Adw.ApplicationWindow):
         self.pairing_view.on_back = on_back or self.show_settings
         self.stack.set_visible_child_name("pairing")
 
-    def show_weight(self) -> None:
+    def show_weight(self, on_back: Callable[[], None] | None = None) -> None:
+        # Defaults to Profile (where Weight is normally opened from); the ride screen's "not
+        # connected"-style status isn't relevant here, but the override exists for the same
+        # reason it does on show_pairing - some future caller may need somewhere else to return to.
+        self.weight_view.on_back = on_back or self.show_profile
         self.stack.set_visible_child_name("weight")
 
     def show_routes(self) -> None:
-        self.stack.set_visible_child_name("routes")
+        self.ride_hub_view.show_routes_tab()
+        self.stack.set_visible_child_name("ride_hub")
+
+    def show_history(self) -> None:
+        self.ride_hub_view.show_history_tab()
+        self.stack.set_visible_child_name("ride_hub")
 
     def show_workouts(self) -> None:
         self.stack.set_visible_child_name("workouts")

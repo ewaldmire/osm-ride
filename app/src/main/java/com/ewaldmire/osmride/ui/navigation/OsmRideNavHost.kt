@@ -5,6 +5,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -13,11 +16,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.ewaldmire.osmride.ui.history.RideHistoryScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
+import com.ewaldmire.osmride.ui.profile.ProfileScreen
 import com.ewaldmire.osmride.ui.ride.RideScreen
+import com.ewaldmire.osmride.ui.ridehub.RideHubScreen
+import com.ewaldmire.osmride.ui.ridehub.RideHubTab
 import com.ewaldmire.osmride.ui.routecreator.RouteCreatorScreen
-import com.ewaldmire.osmride.ui.routes.RoutesListScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
 import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
@@ -31,16 +35,23 @@ import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
  * (its own top bar), so nesting them is safe. Hidden only on [Destinations.RIDE] - the map needs
  * the full viewport while riding.
  *
- * Only genuine sub-pages (Route Creator, Workout Creator, Pairing) get a back arrow in their
- * TopAppBar. The four bottom-nav root tabs (History, Routes, Workouts, Settings) don't - they're
- * reached only via the bottom bar, so a "back" affordance on them was both redundant with it and,
- * worse, always landed on History regardless of which tab the user actually came from (the
- * bottom bar's popUpTo(HISTORY) reset below means popBackStack() on a root tab always resolves
- * to History, not whatever tab preceded it). */
+ * Only genuine sub-pages (Route Creator, Workout Creator, Pairing, Weight) get a back arrow in
+ * their TopAppBar. The four bottom-nav root tabs (Profile, Ride, Workouts, Settings) don't -
+ * they're reached only via the bottom bar, so a "back" affordance on them was both redundant with
+ * it and, worse, always landed on the same fixed screen regardless of which tab the user actually
+ * came from (the bottom bar's popUpTo(RIDE_HUB) reset below means popBackStack() on a root tab
+ * always resolves to the same anchor, not whatever tab preceded it). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
+    // One-shot hint for RideHubScreen: which sub-tab to land on next time it's (re)shown. Only
+    // the ride-finish flow below ever changes this away from its default - see RideHubScreen's
+    // own doc comment for why a hoisted flag, not a nav argument, is what actually works here
+    // (the RideHubScreen backstack entry is never destroyed/recreated across a ride, so a nav
+    // argument's default would only apply on a truly fresh entry, not this one).
+    var rideHubInitialTab by remember { mutableStateOf(RideHubTab.Routes) }
 
     Scaffold(
         bottomBar = {
@@ -49,7 +60,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                     currentRoute = currentRoute,
                     onNavigate = { route ->
                         navController.navigate(route) {
-                            popUpTo(Destinations.HISTORY) { saveState = true }
+                            popUpTo(Destinations.RIDE_HUB) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -60,16 +71,12 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Destinations.HISTORY,
+            startDestination = Destinations.RIDE_HUB,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Destinations.HISTORY) {
-                RideHistoryScreen(
-                    onOpenWeight = { navController.navigate(Destinations.WEIGHT) },
-                )
-            }
-            composable(Destinations.ROUTES_LIST) {
-                RoutesListScreen(
+            composable(Destinations.RIDE_HUB) {
+                RideHubScreen(
+                    initialTab = rideHubInitialTab,
                     onRouteSelected = { routeId -> navController.navigate(Destinations.ride(routeId)) },
                     onCreateRoute = { navController.navigate(Destinations.ROUTE_CREATOR_NEW) },
                     onEditRoute = { routeId, showDerivedHint ->
@@ -96,6 +103,11 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                     showDerivedHint = backStackEntry.arguments?.getBoolean("showDerivedHint") ?: false,
                     onBack = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
+                )
+            }
+            composable(Destinations.PROFILE) {
+                ProfileScreen(
+                    onOpenWeight = { navController.navigate(Destinations.WEIGHT) },
                 )
             }
             composable(Destinations.SETTINGS) {
@@ -140,8 +152,9 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                     RideScreen(
                         routeId = routeId,
                         onFinished = {
+                            rideHubInitialTab = RideHubTab.History
                             navController.navigate(Destinations.SUMMARY) {
-                                popUpTo(Destinations.HISTORY)
+                                popUpTo(Destinations.RIDE_HUB)
                             }
                         },
                         onOpenPairing = { navController.navigate(Destinations.PAIRING) },
@@ -152,7 +165,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             composable(Destinations.SUMMARY) {
                 RideSummaryScreen(
                     onDone = {
-                        navController.popBackStack(Destinations.HISTORY, inclusive = false)
+                        navController.popBackStack(Destinations.RIDE_HUB, inclusive = false)
                     },
                 )
             }

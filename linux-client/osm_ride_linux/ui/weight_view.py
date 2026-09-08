@@ -1,5 +1,5 @@
-"""Log body-weight over time, reached from History's top bar - not app configuration, so not
-under Settings.
+"""Log body-weight over time, reached from Profile - not app configuration, so not under
+Settings.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/weight/WeightScreen.kt.
 """
@@ -7,6 +7,7 @@ Mirrors app/src/main/java/com/ewaldmire/osmride/ui/weight/WeightScreen.kt.
 from __future__ import annotations
 
 import datetime
+from collections.abc import Callable
 
 import gi
 
@@ -26,9 +27,13 @@ class WeightView(ToolbarPage):
         self.window = window
         self._repo = window.app.weight_repository
 
+        # Overwritten per-visit by MainWindow.show_weight() - defaults to Profile since that's
+        # where Weight is normally opened from.
+        self.on_back: Callable[[], None] = window.show_profile
+
         header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Weight Tracking"))
         back = Gtk.Button(icon_name="go-previous-symbolic")
-        back.connect("clicked", lambda _b: window.show_history())
+        back.connect("clicked", lambda _b: self.on_back())
         header.pack_start(back)
         self.add_top_bar(header)
 

@@ -20,20 +20,16 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,7 +44,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.RideRecord
 import com.ewaldmire.osmride.util.Units
 import java.io.File
@@ -58,11 +53,15 @@ import java.time.format.DateTimeFormatter
 
 private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a")
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Body content only, no Scaffold/TopAppBar of its own - embedded inside RideHubScreen alongside
+ * RoutesListContent under one shared top bar (with a Routes/History tab row). See
+ * RideHubScreen.kt.
+ */
 @Composable
-fun RideHistoryScreen(
-    onOpenWeight: () -> Unit,
-    viewModel: RideHistoryViewModel = viewModel(),
+fun RideHistoryContent(
+    padding: PaddingValues,
+    viewModel: RideHistoryViewModel,
 ) {
     val context = LocalContext.current
     val rides by viewModel.rides.collectAsState()
@@ -79,61 +78,46 @@ fun RideHistoryScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("History") },
-                actions = {
-                    // Weight tracking isn't app configuration, so it doesn't belong in Settings -
-                    // it lives here instead, alongside the rest of the rider's personal record.
-                    IconButton(onClick = onOpenWeight) {
-                        Icon(Icons.Filled.MonitorWeight, contentDescription = "Weight Tracking")
-                    }
-                },
+    if (rides.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Filled.History, contentDescription = null)
+            Text(
+                "No completed rides yet.",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 12.dp),
             )
-        },
-    ) { padding ->
-        if (rides.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Filled.History, contentDescription = null)
-                Text(
-                    "No completed rides yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(top = 12.dp),
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "overview") { OverviewCard(rides) }
+            items(rides, key = { it.id }) { record ->
+                RideRecordCard(
+                    record = record,
+                    thumbnailFile = viewModel.thumbnailFile(record),
+                    onEdit = { editingRecord = record },
+                    onShare = {
+                        val file = viewModel.gpxFile(record)
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            file,
+                        )
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/gpx+xml"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Export ride"))
+                    },
+                    onDelete = { viewModel.deleteRide(record.id) },
                 )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item(key = "overview") { OverviewCard(rides) }
-                items(rides, key = { it.id }) { record ->
-                    RideRecordCard(
-                        record = record,
-                        thumbnailFile = viewModel.thumbnailFile(record),
-                        onEdit = { editingRecord = record },
-                        onShare = {
-                            val file = viewModel.gpxFile(record)
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                file,
-                            )
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/gpx+xml"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Export ride"))
-                        },
-                        onDelete = { viewModel.deleteRide(record.id) },
-                    )
-                }
             }
         }
     }
