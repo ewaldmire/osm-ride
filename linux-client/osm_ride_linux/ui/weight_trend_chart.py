@@ -7,12 +7,19 @@ Mirrors app/src/main/java/com/ewaldmire/osmride/ui/weight/WeightTrendChart.kt.
 
 from __future__ import annotations
 
+import datetime
+
+import cairo
 import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa: E402
 
 from ..weight.models import WeightEntry  # noqa: E402
+
+
+def _short_date(epoch_millis: int) -> str:
+    return datetime.datetime.fromtimestamp(epoch_millis / 1000).strftime("%b %-d")
 
 
 class WeightTrendChart(Gtk.DrawingArea):
@@ -60,3 +67,16 @@ class WeightTrendChart(Gtk.DrawingArea):
         for entry in self._entries:
             cr.arc(x_for(entry.recorded_at_epoch_millis), y_for(entry.weight_kg), 3, 0, 2 * 3.14159265)
             cr.fill()
+
+        # Without these, the line's x-position was scaled by real elapsed time but nothing on
+        # screen actually told the viewer that - it just looked like an arbitrary shape.
+        cr.select_font_face("sans-serif", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(12)
+        cr.set_source_rgb(0.1, 0.1, 0.1)
+        start_label = _short_date(min_time)
+        end_label = _short_date(max_time)
+        cr.move_to(4, height - 6)
+        cr.show_text(start_label)
+        end_extents = cr.text_extents(end_label)
+        cr.move_to(width - end_extents.width - 4, height - 6)
+        cr.show_text(end_label)

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -59,7 +60,10 @@ private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RideHistoryScreen(viewModel: RideHistoryViewModel = viewModel()) {
+fun RideHistoryScreen(
+    onOpenWeight: () -> Unit,
+    viewModel: RideHistoryViewModel = viewModel(),
+) {
     val context = LocalContext.current
     val rides by viewModel.rides.collectAsState()
     var editingRecord by remember { mutableStateOf<RideRecord?>(null) }
@@ -77,7 +81,16 @@ fun RideHistoryScreen(viewModel: RideHistoryViewModel = viewModel()) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("History") })
+            TopAppBar(
+                title = { Text("History") },
+                actions = {
+                    // Weight tracking isn't app configuration, so it doesn't belong in Settings -
+                    // it lives here instead, alongside the rest of the rider's personal record.
+                    IconButton(onClick = onOpenWeight) {
+                        Icon(Icons.Filled.MonitorWeight, contentDescription = "Weight Tracking")
+                    }
+                },
+            )
         },
     ) { padding ->
         if (rides.isEmpty()) {

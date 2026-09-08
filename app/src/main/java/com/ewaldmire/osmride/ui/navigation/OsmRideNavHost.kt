@@ -64,7 +64,9 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(Destinations.HISTORY) {
-                RideHistoryScreen()
+                RideHistoryScreen(
+                    onOpenWeight = { navController.navigate(Destinations.WEIGHT) },
+                )
             }
             composable(Destinations.ROUTES_LIST) {
                 RoutesListScreen(
@@ -99,7 +101,6 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             composable(Destinations.SETTINGS) {
                 SettingsScreen(
                     onOpenPairing = { navController.navigate(Destinations.PAIRING) },
-                    onOpenWeight = { navController.navigate(Destinations.WEIGHT) },
                 )
             }
             composable(Destinations.WEIGHT) {

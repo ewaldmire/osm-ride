@@ -34,7 +34,13 @@ class HistoryView(ToolbarPage):
         self.window = window
         self._repo = window.app.history_repository
 
-        self.add_top_bar(Adw.HeaderBar(title_widget=Adw.WindowTitle(title="History")))
+        header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="History"))
+        # Weight tracking isn't app configuration, so it doesn't belong in Settings - it lives
+        # here instead, alongside the rest of the rider's personal record.
+        weight_button = Gtk.Button(icon_name="osm-ride-scale-symbolic", tooltip_text="Weight Tracking")
+        weight_button.connect("clicked", lambda _b: window.show_weight())
+        header.pack_end(weight_button)
+        self.add_top_bar(header)
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         outer.set_margin_top(16)

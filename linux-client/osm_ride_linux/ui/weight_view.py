@@ -1,4 +1,5 @@
-"""Log body-weight over time, reached from Settings.
+"""Log body-weight over time, reached from History's top bar - not app configuration, so not
+under Settings.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/weight/WeightScreen.kt.
 """
@@ -11,7 +12,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk  # noqa: E402
+from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 from ..util import units  # noqa: E402
 from ..weight.models import WeightEntry  # noqa: E402
@@ -27,7 +28,7 @@ class WeightView(ToolbarPage):
 
         header = Adw.HeaderBar(title_widget=Adw.WindowTitle(title="Weight Tracking"))
         back = Gtk.Button(icon_name="go-previous-symbolic")
-        back.connect("clicked", lambda _b: window.show_settings())
+        back.connect("clicked", lambda _b: window.show_history())
         header.pack_start(back)
         self.add_top_bar(header)
 
@@ -37,6 +38,19 @@ class WeightView(ToolbarPage):
         outer.set_margin_start(16)
         outer.set_margin_end(16)
         outer.set_valign(Gtk.Align.START)
+
+        self._selected_date = datetime.date.today()
+
+        date_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        date_row.append(Gtk.Label(label="Date:", xalign=0.0))
+        self._date_button = Gtk.MenuButton(label="Today")
+        self._calendar = Gtk.Calendar()
+        self._calendar.connect("day-selected", self._on_date_selected)
+        date_popover = Gtk.Popover()
+        date_popover.set_child(self._calendar)
+        self._date_button.set_popover(date_popover)
+        date_row.append(self._date_button)
+        outer.append(date_row)
 
         add_group = Adw.PreferencesGroup()
         self._weight_entry = Adw.EntryRow(title="Weight (lb)")
@@ -95,6 +109,22 @@ class WeightView(ToolbarPage):
         dt = datetime.datetime.fromtimestamp(epoch_millis / 1000)
         return dt.strftime("%b %d, %Y")
 
+    def _on_date_selected(self, calendar: Gtk.Calendar) -> None:
+        gdt = calendar.get_date()
+        self._selected_date = datetime.date(gdt.get_year(), gdt.get_month(), gdt.get_day_of_month())
+        self._update_date_button_label()
+
+    def _update_date_button_label(self) -> None:
+        if self._selected_date == datetime.date.today():
+            self._date_button.set_label("Today")
+        else:
+            self._date_button.set_label(self._selected_date.strftime("%b %d, %Y"))
+
+    def _reset_selected_date(self) -> None:
+        self._selected_date = datetime.date.today()
+        self._calendar.select_day(GLib.DateTime.new_now_local())
+        self._update_date_button_label()
+
     def _on_log_clicked(self, _button: Gtk.Button) -> None:
         try:
             lbs = float(self._weight_entry.get_text().strip())
@@ -102,5 +132,9 @@ class WeightView(ToolbarPage):
             return
         if lbs <= 0:
             return
-        self._repo.add_entry(units.lbs_to_kg(lbs))
+        # Local noon, not midnight - keeps the stored timestamp safely inside the selected
+        # calendar day regardless of timezone, since only the date (not time-of-day) matters here.
+        recorded_at = datetime.datetime.combine(self._selected_date, datetime.time(12, 0))
+        self._repo.add_entry(units.lbs_to_kg(lbs), int(recorded_at.timestamp() * 1000))
         self._weight_entry.set_text("")
+        self._reset_selected_date()

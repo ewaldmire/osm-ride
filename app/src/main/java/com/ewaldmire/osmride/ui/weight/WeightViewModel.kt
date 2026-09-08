@@ -14,8 +14,8 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
 
     val entries: StateFlow<List<WeightEntry>> = repository.entries
 
-    fun addEntry(weightLbs: Double) {
-        viewModelScope.launch { repository.addEntry(Units.lbsToKg(weightLbs)) }
+    fun addEntry(weightLbs: Double, recordedAtEpochMillis: Long) {
+        viewModelScope.launch { repository.addEntry(Units.lbsToKg(weightLbs), recordedAtEpochMillis) }
     }
 
     fun deleteEntry(id: String) {

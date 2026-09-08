@@ -16,15 +16,19 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material3.Card
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,10 +43,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.util.Units
 import com.ewaldmire.osmride.weight.WeightEntry
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+
+/** Material3's DatePicker works in UTC internally (selectedDateMillis is UTC midnight of the
+ * chosen day) - converting straight to epoch millis and using it as a real timestamp would shift
+ * the date by a day in any negative-UTC-offset zone (e.g. all of the Americas). Going through
+ * LocalDate and re-anchoring to local noon avoids that day-shift entirely. */
+private fun LocalDate.toUtcMidnightMillis(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun localDateFromUtcMidnightMillis(millis: Long): LocalDate =
+    Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+private fun LocalDate.toLocalNoonEpochMillis(): Long =
+    atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +68,30 @@ fun WeightScreen(
 ) {
     val entries by viewModel.entries.collectAsState()
     var weightInput by remember { mutableStateOf("") }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate.toUtcMidnightMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate = localDateFromUtcMidnightMillis(millis)
+                        }
+                        showDatePicker = false
+                    },
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -66,28 +106,34 @@ fun WeightScreen(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = weightInput,
-                    onValueChange = { text -> weightInput = text.filter { it.isDigit() || it == '.' } },
-                    label = { Text("Weight (lb)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    onClick = {
-                        val lbs = weightInput.toDoubleOrNull()
-                        if (lbs != null && lbs > 0) {
-                            viewModel.addEntry(lbs)
-                            weightInput = ""
-                        }
-                    },
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (selectedDate == LocalDate.now()) "Today" else selectedDate.format(dateFormatter))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("Log")
+                    OutlinedTextField(
+                        value = weightInput,
+                        onValueChange = { text -> weightInput = text.filter { it.isDigit() || it == '.' } },
+                        label = { Text("Weight (lb)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = {
+                            val lbs = weightInput.toDoubleOrNull()
+                            if (lbs != null && lbs > 0) {
+                                viewModel.addEntry(lbs, selectedDate.toLocalNoonEpochMillis())
+                                weightInput = ""
+                                selectedDate = LocalDate.now()
+                            }
+                        },
+                    ) {
+                        Text("Log")
+                    }
                 }
             }
 

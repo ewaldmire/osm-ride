@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,7 +31,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onOpenPairing: () -> Unit, onOpenWeight: () -> Unit) {
+fun SettingsScreen(onOpenPairing: () -> Unit) {
     val context = LocalContext.current
     var ftpText by remember { mutableStateOf(SettingsPrefs.getFtpWatts(context)?.toString() ?: "") }
 
@@ -50,12 +49,6 @@ fun SettingsScreen(onOpenPairing: () -> Unit, onOpenWeight: () -> Unit) {
                 title = "Bluetooth Devices",
                 subtitle = "Pair your smart trainer and heart rate monitor",
                 onClick = onOpenPairing,
-            )
-            SettingsRow(
-                icon = Icons.Filled.MonitorWeight,
-                title = "Weight Tracking",
-                subtitle = "Log your weight over time",
-                onClick = onOpenWeight,
             )
 
             Text("Training", style = MaterialTheme.typography.titleMedium)

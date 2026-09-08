@@ -33,17 +33,6 @@ class SettingsView(ToolbarPage):
         devices_group.add(pairing_row)
         page.add(devices_group)
 
-        weight_group = Adw.PreferencesGroup()
-        weight_row = Adw.ActionRow(
-            title="Weight Tracking",
-            subtitle="Log your weight over time",
-            activatable=True,
-        )
-        weight_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
-        weight_row.connect("activated", lambda _r: window.show_weight())
-        weight_group.add(weight_row)
-        page.add(weight_group)
-
         training_group = Adw.PreferencesGroup(
             title="Training",
             description="Needed to convert %FTP-based .mrc/.zwo workouts to watts",
