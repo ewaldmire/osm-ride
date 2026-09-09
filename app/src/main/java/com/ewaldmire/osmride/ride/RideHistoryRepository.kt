@@ -49,6 +49,47 @@ class RideHistoryRepository(context: Context) {
             record
         }
 
+    /** Saves an outdoor ride imported from a .fit file - same storage shape as a live-recorded
+     * ride, just with no [RideRecord.routeId] (there's no in-app route it was ridden against) and
+     * a caller-supplied completion time (the ride's own recorded time, not "now"). See
+     * FitFileParser/RideHistoryViewModel.importFitFile. */
+    suspend fun importRide(
+        title: String,
+        completedAtEpochMillis: Long,
+        distanceMeters: Double,
+        durationSeconds: Long,
+        avgSpeedMps: Double,
+        avgPowerWatts: Double?,
+        avgCadenceRpm: Double?,
+        avgHeartRateBpm: Double?,
+        estimatedKilocalories: Double?,
+        gpxContent: String,
+    ): RideRecord = withContext(Dispatchers.IO) {
+        val id = UUID.randomUUID().toString()
+        val fileName = "$id.gpx"
+        File(ridesDir, fileName).writeText(gpxContent)
+
+        val record = RideRecord(
+            id = id,
+            routeName = title,
+            title = title,
+            routeId = null,
+            completedAtEpochMillis = completedAtEpochMillis,
+            distanceMeters = distanceMeters,
+            durationSeconds = durationSeconds,
+            avgSpeedMps = avgSpeedMps,
+            avgPowerWatts = avgPowerWatts,
+            avgCadenceRpm = avgCadenceRpm,
+            avgHeartRateBpm = avgHeartRateBpm,
+            estimatedKilocalories = estimatedKilocalories,
+            gpxFileName = fileName,
+        )
+        val updated = (listOf(record) + _rides.value).sortedByDescending { it.completedAtEpochMillis }
+        _rides.value = updated
+        saveIndex(updated)
+        record
+    }
+
     /** Lets the rider rename a ride and add notes after the fact - useful when they ride the
      * same route regularly and want to tell repeat rides of it apart in history. */
     suspend fun updateRide(id: String, title: String, notes: String) = withContext(Dispatchers.IO) {

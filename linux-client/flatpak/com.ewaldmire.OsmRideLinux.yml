@@ -24,7 +24,7 @@ modules:
       build-args:
         - --share=network
     build-commands:
-      - pip3 install --prefix=/app --no-cache-dir dbus-fast bleak
+      - pip3 install --prefix=/app --no-cache-dir dbus-fast bleak fitparse
     # PyGObject (the `gi` bindings) and GTK4/libadwaita/WebKit themselves come from the runtime,
     # not pip - see requirements.txt's note on why that package can't be pip-installed at all.
     sources: []

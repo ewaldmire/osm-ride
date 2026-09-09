@@ -55,6 +55,46 @@ class RideHistoryRepository:
         self._update_rides([record, *self.rides])
         return record
 
+    def import_ride(
+        self,
+        title: str,
+        completed_at_epoch_millis: int,
+        distance_meters: float,
+        duration_seconds: float,
+        avg_speed_mps: float,
+        avg_power_watts: float | None,
+        avg_cadence_rpm: float | None,
+        avg_heart_rate_bpm: float | None,
+        estimated_kilocalories: float | None,
+        gpx_content: str,
+    ) -> RideRecord:
+        """Saves an outdoor ride imported from a .fit file - same storage shape as a
+        live-recorded ride, just with no route_id (there's no in-app route it was ridden against)
+        and a caller-supplied completion time (the ride's own recorded time, not "now"). See
+        fit_parser/history_view.py's import_ride."""
+        record_id = str(uuid.uuid4())
+        file_name = f"{record_id}.gpx"
+        (self._rides_dir / file_name).write_text(gpx_content, encoding="utf-8")
+
+        record = RideRecord(
+            id=record_id,
+            route_name=title,
+            title=title,
+            route_id=None,
+            completed_at_epoch_millis=completed_at_epoch_millis,
+            distance_meters=distance_meters,
+            duration_seconds=duration_seconds,
+            avg_speed_mps=avg_speed_mps,
+            avg_power_watts=avg_power_watts,
+            avg_cadence_rpm=avg_cadence_rpm,
+            avg_heart_rate_bpm=avg_heart_rate_bpm,
+            estimated_kilocalories=estimated_kilocalories,
+            gpx_file_name=file_name,
+        )
+        updated = sorted([record, *self.rides], key=lambda r: r.completed_at_epoch_millis, reverse=True)
+        self._update_rides(updated)
+        return record
+
     def update_ride(self, ride_id: str, title: str, notes: str) -> None:
         """Lets the rider rename a ride and add notes after the fact - useful when they ride the
         same route regularly and want to tell repeat rides of it apart in history."""

@@ -58,6 +58,7 @@ fun RideHubScreen(
     LaunchedEffect(initialTab) { selectedTab = initialTab }
 
     val importError by routesViewModel.importError.collectAsState()
+    val historyImportError by historyViewModel.importError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -65,11 +66,22 @@ fun RideHubScreen(
             routesViewModel.importGpx(uri, queryDisplayName(uri, context))
         }
     }
+    val importFitLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            historyViewModel.importFitFile(uri, queryDisplayName(uri, context))
+        }
+    }
 
     LaunchedEffect(importError) {
         importError?.let {
             snackbarHostState.showSnackbar(it)
             routesViewModel.clearImportError()
+        }
+    }
+    LaunchedEffect(historyImportError) {
+        historyImportError?.let {
+            snackbarHostState.showSnackbar(it)
+            historyViewModel.clearImportError()
         }
     }
 
@@ -84,7 +96,7 @@ fun RideHubScreen(
                                 if (selectedTab == RideHubTab.Routes) {
                                     "Create a route or import a GPX file, then tap it to start riding"
                                 } else {
-                                    "Review your completed rides and stats"
+                                    "Review your completed rides and stats, or import a .fit file from an outdoor ride"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -96,6 +108,8 @@ fun RideHubScreen(
                             // tell what they do" (confirmed by the user) without a label.
                             TextButton(onClick = onCreateRoute) { Text("Create") }
                             TextButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
+                        } else {
+                            TextButton(onClick = { importFitLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
                         }
                     },
                 )

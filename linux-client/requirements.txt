@@ -5,6 +5,7 @@
 # (confirmed directly against the distro repos, not assumed), so there is no viable native
 # dnf-installed dev path for this app's map screens on this distro family.
 bleak>=1.0
+fitparse>=1.2
 
 # Dev/test only
 pytest>=8.0

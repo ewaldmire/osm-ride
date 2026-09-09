@@ -1,24 +1,29 @@
-"""Ride history list + overview stats.
+"""Ride history list + overview stats, plus importing an outdoor ride from a .fit file (a bike
+computer/GPS watch/app recording, as opposed to a route ridden in-app).
 
 Content only, no header bar of its own - embedded inside RideHubView alongside RoutesView under
 one shared header (with a Routes/History switcher). See ride_hub_view.py.
 
-Mirrors app/src/main/java/com/ewaldmire/osmride/ui/history/RideHistoryScreen.kt.
+Mirrors app/src/main/java/com/ewaldmire/osmride/ui/history/RideHistoryScreen.kt and
+ui/ridehub/RideHubScreen.kt's FIT-import wiring.
 """
 
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gio", "2.0")
-from gi.repository import Adw, Gio, Gtk  # noqa: E402
+from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
-from ..ride.models import RideRecord  # noqa: E402
+from ..ride import fit_parser, gpx_writer  # noqa: E402
+from ..ride.models import RecordedTrackPoint, RideRecord  # noqa: E402
 from ..util import units  # noqa: E402
+from . import route_thumbnail_generator  # noqa: E402
 from .route_thumbnail_image import build_thumbnail_widget  # noqa: E402
 
 # Same 5:3 aspect/size as RoutesView's thumbnails (see routes_view.py) - a snapshot of each ride's
@@ -139,6 +144,76 @@ class HistoryView(Gtk.Box):
             row.set_subtitle(f"{row.get_subtitle()}\n{record.notes}")
 
         return row
+
+    def import_ride(self) -> None:
+        dialog = Gtk.FileDialog(title="Import .fit Ride")
+        fit_filter = Gtk.FileFilter()
+        fit_filter.set_name("FIT files")
+        fit_filter.add_pattern("*.fit")
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(fit_filter)
+        dialog.set_filters(filters)
+        dialog.open(self.window, None, self._on_import_fit_file_chosen)
+
+    def _on_import_fit_file_chosen(self, dialog: Gtk.FileDialog, result: Gio.AsyncResult) -> None:
+        try:
+            file = dialog.open_finish(result)
+        except GLib.Error:
+            return  # cancelled
+        path = Path(file.get_path())
+        summary = fit_parser.parse(str(path))
+        if summary is None:
+            self._show_error("Could not read that .fit file")
+            return
+
+        track_points = [
+            RecordedTrackPoint(
+                timestamp=p.timestamp,
+                lat=p.lat,
+                lon=p.lon,
+                elevation_meters=p.elevation_meters,
+                heart_rate_bpm=p.heart_rate_bpm,
+                cadence_rpm=p.cadence_rpm,
+            )
+            for p in summary.points
+            if p.lat is not None and p.lon is not None
+        ]
+        if len(track_points) < 2:
+            self._show_error("That .fit file has no usable GPS track")
+            return
+
+        title = path.stem or "Imported Ride"
+        gpx_content = gpx_writer.write(title, track_points)
+        record = self._repo.import_ride(
+            title=title,
+            completed_at_epoch_millis=round(summary.end_epoch_seconds * 1000),
+            distance_meters=summary.distance_meters,
+            duration_seconds=summary.duration_seconds,
+            avg_speed_mps=summary.avg_speed_mps,
+            avg_power_watts=summary.avg_power_watts,
+            avg_cadence_rpm=summary.avg_cadence_rpm,
+            avg_heart_rate_bpm=summary.avg_heart_rate_bpm,
+            estimated_kilocalories=summary.total_calories,
+            gpx_content=gpx_content,
+        )
+        self._generate_ride_thumbnail(record, track_points)
+
+    def _generate_ride_thumbnail(self, record: RideRecord, track_points: list[RecordedTrackPoint]) -> None:
+        if len(track_points) < 2:
+            return
+        thumbnail_file_name = f"{record.id}_thumb.png"
+        destination = self._repo.directory / thumbnail_file_name
+
+        def on_done(success: bool) -> None:
+            if success:
+                self._repo.set_thumbnail(record.id, thumbnail_file_name)
+
+        route_thumbnail_generator.generate(track_points, destination, on_done)
+
+    def _show_error(self, message: str) -> None:
+        dialog = Adw.AlertDialog.new("Import Failed", message)
+        dialog.add_response("ok", "OK")
+        dialog.present(self.window)
 
     def _format_date(self, epoch_millis: int) -> str:
         dt = datetime.datetime.fromtimestamp(epoch_millis / 1000)

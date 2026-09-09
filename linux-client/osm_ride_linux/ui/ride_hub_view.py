@@ -1,6 +1,7 @@
 """Combines RoutesView and HistoryView under one header with a Routes/History switcher - riding
 and reviewing past rides are both "the main thing you do here", so they share one bottom-nav
-tab instead of two. Create/Import actions only show up while the Routes sub-tab is active.
+tab instead of two. Create Route only shows up on the Routes sub-tab; Import switches between
+importing a GPX route (Routes) and importing a .fit outdoor-ride recording (History).
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/ridehub/RideHubScreen.kt.
 """
@@ -18,7 +19,7 @@ from .routes_view import RoutesView  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
 
 _ROUTES_SUBTITLE = "Create a route or import a GPX file, then tap it to start riding"
-_HISTORY_SUBTITLE = "Review your completed rides and stats"
+_HISTORY_SUBTITLE = "Review your completed rides and stats, or import a .fit file from an outdoor ride"
 
 
 class RideHubView(ToolbarPage):
@@ -39,8 +40,8 @@ class RideHubView(ToolbarPage):
 
         self._create_button = Gtk.Button(label="Create Route…")
         self._create_button.connect("clicked", lambda _b: window.show_route_creator_new())
-        self._import_button = Gtk.Button(label="Import GPX…")
-        self._import_button.connect("clicked", lambda _b: self.routes_view.import_route())
+        self._import_button = Gtk.Button()
+        self._import_button.connect("clicked", lambda _b: self._on_import_clicked())
 
         # Title+subtitle here (matching Profile/Workouts/Settings' header pattern), with the tab
         # switcher as its own row below rather than sharing the title slot - there's no room for
@@ -62,8 +63,14 @@ class RideHubView(ToolbarPage):
     def _on_tab_changed(self) -> None:
         is_routes = self._stack.get_visible_child_name() == "routes"
         self._create_button.set_visible(is_routes)
-        self._import_button.set_visible(is_routes)
+        self._import_button.set_label("Import GPX…" if is_routes else "Import .fit…")
         self._window_title.set_subtitle(_ROUTES_SUBTITLE if is_routes else _HISTORY_SUBTITLE)
+
+    def _on_import_clicked(self) -> None:
+        if self._stack.get_visible_child_name() == "routes":
+            self.routes_view.import_route()
+        else:
+            self.history_view.import_ride()
 
     def show_routes_tab(self) -> None:
         self._stack.set_visible_child_name("routes")
