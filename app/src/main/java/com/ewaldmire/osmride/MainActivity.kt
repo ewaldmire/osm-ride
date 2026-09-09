@@ -54,13 +54,16 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
-    /** Three shapes MainActivity can be launched with, distinguished by action/data:
+    /** Four shapes MainActivity can be launched with, distinguished by action/data:
      *  - plain MAIN/LAUNCHER (no data/extras) - normal app open, nothing to do here.
      *  - VIEW with an osmride://import-workout deep link - fosslift's strength-workout share
      *    (see StrengthWorkoutImport.kt).
      *  - SEND with a file in EXTRA_STREAM - the OS Sharesheet path for a .fit file shared from
      *    another app (e.g. a bike computer's companion app) - see AndroidManifest.xml's
-     *    ACTION_SEND intent-filter and FitFileImporter.kt. */
+     *    intent-filter and FitFileImporter.kt.
+     *  - SEND_MULTIPLE, same as SEND but with EXTRA_STREAM as an ArrayList - some apps (Wahoo's
+     *    ELEMNT app among them) always use the multi-file share path even for a single file. Only
+     *    the first file is imported; OSM Ride only ever saves one ride from a share. */
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         when (intent.action) {
@@ -69,6 +72,11 @@ class MainActivity : ComponentActivity() {
             }
             Intent.ACTION_SEND -> {
                 val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return
+                pendingFitShare = PendingFitShare(uri, queryDisplayName(uri))
+            }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val uri = IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+                    ?.firstOrNull() ?: return
                 pendingFitShare = PendingFitShare(uri, queryDisplayName(uri))
             }
         }
