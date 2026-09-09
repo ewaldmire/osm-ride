@@ -43,10 +43,12 @@
 
             <!--
               Lets fosslift (a companion app on the same device) share a completed strength
-              workout in via osmride://import-workout?data=<url-encoded JSON> - see
-              StrengthWorkoutImport.kt for the payload shape. android:host is intentionally not
-              also wildcarded/omitted - only this exact host is a workout import; any other
-              osmride:// deep link added later gets its own host, not folded into this filter.
+              workout in via osmride://import-workout?data=<url-encoded liftohistory text> - the
+              payload is fosslift's own "Copy as Text" export format, not something invented for
+              this integration. See StrengthWorkoutImport.kt/LiftohistoryImport.kt. android:host
+              is intentionally not also wildcarded/omitted - only this exact host is a workout
+              import; any other osmride:// deep link added later gets its own host, not folded
+              into this filter.
             -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
