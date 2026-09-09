@@ -6,11 +6,11 @@ Body Metrics, Ride, the two Creators) are added with add_named() so the stack ca
 without the switcher ever showing a button - and without highlighting any tab - for them, mirroring
 the "no tab active on sub-screens" behavior the GTK3 version's custom bar had.
 
-"Ride" (add_titled "ride_hub") combines the old separate History/Routes tabs behind one Routes/
-History switcher (see ride_hub_view.py) - both are "things you do with your rides", not two
-distinct app areas. "Profile" (FTP + weight/waist, see profile_view.py) replaced History as a top-level
-tab - that's personal "about you" data, not app configuration, so it doesn't belong in Settings
-either.
+"Ride" (add_titled "ride_hub") is route planning only (see ride_hub_view.py) - it used to combine
+Routes with a History tab behind a switcher, but History moved to "Profile" (see profile_view.py)
+once outdoor .fit imports could be any activity type, not just cycling. "Profile" holds Activities
+(completed-activity history) + FTP/weight/waist - personal "about you" data, not app
+configuration, so it doesn't belong in Settings either.
 
 Simpler than Android Navigation's back-stack - GTK apps don't have a system back button to wire
 up, and every screen here can always get back to the hub via the switcher bar, so a flat
@@ -115,11 +115,6 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.set_visible_child_name("body_metrics")
 
     def show_routes(self) -> None:
-        self.ride_hub_view.show_routes_tab()
-        self.stack.set_visible_child_name("ride_hub")
-
-    def show_history(self) -> None:
-        self.ride_hub_view.show_history_tab()
         self.stack.set_visible_child_name("ride_hub")
 
     def show_workouts(self) -> None:

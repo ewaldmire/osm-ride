@@ -1,4 +1,7 @@
-"""Persists completed rides (GPX + summary) to local storage for the history screen.
+"""Persists completed rides (GPX + summary) to local storage, shown in Profile's Activities feed.
+Every record is still cycling-shaped in storage (distance/speed/power/cadence), but
+RideRecord.activity_type tracks what it actually was for .fit imports that turn out not to be
+cycling.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ride/RideHistoryRepository.kt.
 """
@@ -67,11 +70,12 @@ class RideHistoryRepository:
         avg_heart_rate_bpm: float | None,
         estimated_kilocalories: float | None,
         gpx_content: str,
+        activity_type: str,
     ) -> RideRecord:
-        """Saves an outdoor ride imported from a .fit file - same storage shape as a
+        """Saves an outdoor activity imported from a .fit file - same storage shape as a
         live-recorded ride, just with no route_id (there's no in-app route it was ridden against)
-        and a caller-supplied completion time (the ride's own recorded time, not "now"). See
-        fit_parser/history_view.py's import_ride."""
+        and a caller-supplied completion time (the activity's own recorded time, not "now"). See
+        fit_parser/activities_view.py's import_activity."""
         record_id = str(uuid.uuid4())
         file_name = f"{record_id}.gpx"
         (self._rides_dir / file_name).write_text(gpx_content, encoding="utf-8")
@@ -90,6 +94,7 @@ class RideHistoryRepository:
             avg_heart_rate_bpm=avg_heart_rate_bpm,
             estimated_kilocalories=estimated_kilocalories,
             gpx_file_name=file_name,
+            activity_type=activity_type,
         )
         updated = sorted([record, *self.rides], key=lambda r: r.completed_at_epoch_millis, reverse=True)
         self._update_rides(updated)

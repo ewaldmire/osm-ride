@@ -1,13 +1,13 @@
-"""Personal "about you" data used elsewhere in the app - FTP (for %FTP-based workouts) and
-weight/waist (their own tracking screen, see body_metrics_view.py) - as opposed to Settings, which
-is just app configuration (Bluetooth pairing).
+"""Personal "about you" data: completed activities (any .fit-imported outdoor activity - see
+activities_view.py) and body measurements/training info (weight/waist/body-fat via Body Metrics,
+FTP) - as opposed to Settings, which is just app configuration (Bluetooth pairing). Tabbed the
+same way as the Ride hub/Body Metrics screens, since Activities used to live under the Ride hub
+before .fit imports could be non-cycling activities as well.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/profile/ProfileScreen.kt.
 """
 
 from __future__ import annotations
-
-import datetime
 
 import gi
 
@@ -16,7 +16,11 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk  # noqa: E402
 
 from ..util import units  # noqa: E402
+from .activities_view import ActivitiesView  # noqa: E402
 from .toolbar_page import ToolbarPage  # noqa: E402
+
+_ACTIVITIES_SUBTITLE = "Completed rides, outdoor activities, and workouts"
+_METRICS_SUBTITLE = "Personal info used to tailor your training"
 
 
 class ProfileView(ToolbarPage):
@@ -27,20 +31,46 @@ class ProfileView(ToolbarPage):
         self._waist_repo = window.app.waist_repository
         app = window.app
 
-        self.add_top_bar(
-            Adw.HeaderBar(
-                title_widget=Adw.WindowTitle(
-                    title="Profile", subtitle="Personal info used to tailor your training"
-                )
-            )
-        )
+        self.activities_view = ActivitiesView(window)
+        self._metrics_page = self._build_metrics_page(app)
 
+        self._stack = Gtk.Stack()
+        self._stack.add_titled(self.activities_view, "activities", "Activities")
+        self._stack.add_titled(self._metrics_page, "metrics", "Metrics")
+        self._stack.connect("notify::visible-child-name", lambda _s, _p: self._on_tab_changed())
+
+        switcher = Gtk.StackSwitcher()
+        switcher.set_stack(self._stack)
+
+        self._import_button = Gtk.Button(label="Import .fit…")
+        self._import_button.connect("clicked", lambda _b: self.activities_view.import_activity())
+
+        self._window_title = Adw.WindowTitle(title="Profile", subtitle=_ACTIVITIES_SUBTITLE)
+        header = Adw.HeaderBar(title_widget=self._window_title)
+        header.pack_end(self._import_button)
+        self.add_top_bar(header)
+
+        switcher_row = Gtk.CenterBox()
+        switcher_row.set_center_widget(switcher)
+        switcher_row.add_css_class("toolbar")
+        self.add_top_bar(switcher_row)
+
+        self.set_content(self._stack)
+        self._on_tab_changed()
+
+        # Not a persistent on_entries_changed subscription - BodyMetricsView already owns that
+        # single-subscriber callback slot on each repo for its own list/chart. MainWindow.show_
+        # profile() calls this directly instead, same lazy-refresh-on-navigate pattern already
+        # used elsewhere (e.g. RouteCreatorView.start_edit()).
+        self.refresh_body_metrics_summary()
+
+    def _build_metrics_page(self, app) -> Gtk.Widget:  # noqa: ANN001 - OsmRideApplication
         page = Adw.PreferencesPage()
 
         body_metrics_group = Adw.PreferencesGroup()
         self._body_metrics_row = Adw.ActionRow(title="Body Metrics", activatable=True)
         self._body_metrics_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
-        self._body_metrics_row.connect("activated", lambda _r: window.show_body_metrics())
+        self._body_metrics_row.connect("activated", lambda _r: self.window.show_body_metrics())
         body_metrics_group.add(self._body_metrics_row)
         page.add(body_metrics_group)
 
@@ -56,13 +86,12 @@ class ProfileView(ToolbarPage):
         training_group.add(self._ftp_row)
         page.add(training_group)
 
-        self.set_content(page)
+        return page
 
-        # Not a persistent on_entries_changed subscription - BodyMetricsView already owns that
-        # single-subscriber callback slot on each repo for its own list/chart. MainWindow.show_
-        # profile() calls this directly instead, same lazy-refresh-on-navigate pattern already
-        # used elsewhere (e.g. RouteCreatorView.start_edit()).
-        self.refresh_body_metrics_summary()
+    def _on_tab_changed(self) -> None:
+        is_activities = self._stack.get_visible_child_name() == "activities"
+        self._import_button.set_visible(is_activities)
+        self._window_title.set_subtitle(_ACTIVITIES_SUBTITLE if is_activities else _METRICS_SUBTITLE)
 
     def refresh_body_metrics_summary(self) -> None:
         latest_weight = self._weight_repo.entries[0] if self._weight_repo.entries else None
@@ -78,10 +107,6 @@ class ProfileView(ToolbarPage):
         if latest_waist is not None:
             parts.append(f"Waist {units.format_waist_cm(latest_waist.waist_cm)}")
         return " · ".join(parts)
-
-    def _format_date(self, epoch_millis: int) -> str:
-        dt = datetime.datetime.fromtimestamp(epoch_millis / 1000)
-        return dt.strftime("%b %d, %Y")
 
     def _on_ftp_changed(self, entry: Adw.EntryRow) -> None:
         digits = "".join(c for c in entry.get_text() if c.isdigit())

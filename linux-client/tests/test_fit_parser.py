@@ -88,6 +88,7 @@ _SESSION_FIELDS = [
     (18, 1, 0x02),  # avg_cadence
     (20, 2, 0x84),  # avg_power
     (11, 2, 0x84),  # total_calories
+    (5, 1, 0x00),  # sport (enum) - 41 = kayaking
 ]
 
 
@@ -122,6 +123,8 @@ def full_fit_file(tmp_path: Path) -> tuple[str, int]:
         + bytes([125, 82])
         + _u16(160)
         + _u16(50)
+        + bytes([41])  # sport = kayaking - this is the exact real-world case that motivated
+        # tracking activity type at all: an outdoor .fit import that isn't a bike ride.
     )
     return _write(tmp_path, "full.fit", _build_fit(body)), t0
 
@@ -140,6 +143,7 @@ def test_parses_points_and_session_summary(full_fit_file: tuple[str, int]):
     assert summary.avg_cadence_rpm == 82
     assert summary.avg_heart_rate_bpm == 125
     assert summary.total_calories == 50
+    assert summary.activity_type == "kayaking"
 
     assert len(summary.points) == 3
     first = summary.points[0]
@@ -168,6 +172,7 @@ def test_falls_back_to_computed_summary_without_a_session_message(tmp_path: Path
     assert summary.avg_speed_mps == pytest.approx(3.0)
     assert summary.avg_power_watts is None
     assert summary.total_calories is None
+    assert summary.activity_type == "other"
 
 
 def test_walks_past_an_unrelated_interleaved_message_type(tmp_path: Path):

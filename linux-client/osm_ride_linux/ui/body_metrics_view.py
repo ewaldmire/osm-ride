@@ -1,5 +1,5 @@
-"""Weight and waist tracking together, behind a tab switcher (same pattern as the Ride hub, see
-ride_hub_view.py) - waist is the primary "visible abs" signal per this feature's own spec, at
+"""Weight and waist tracking together, behind a tab switcher (same pattern as Profile, see
+profile_view.py) - waist is the primary "visible abs" signal per this feature's own spec, at
 least as important as weight, so it gets equal billing rather than being buried as an afterthought.
 
 Reached from Profile - not app configuration, so not under Settings.

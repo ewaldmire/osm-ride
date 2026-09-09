@@ -101,7 +101,7 @@ class ParsedWorkout:
 
 @dataclass
 class RideRecord:
-    """Persisted summary of a completed ride, shown in the ride history list."""
+    """Persisted summary of a completed ride, shown in Profile's Activities feed."""
 
     id: str
     route_name: str
@@ -122,6 +122,9 @@ class RideRecord:
     # saved (see ride_view.py's _on_ride_finished); None until that finishes, or for rides saved
     # before this field existed.
     thumbnail_file_name: str | None = None
+    # Defaults to "cycling" for backward compatibility - every ride saved before this field
+    # existed was a live-recorded indoor ride, which is always cycling. See activity_type.py.
+    activity_type: str = "cycling"
 
     def __post_init__(self) -> None:
         if self.title is None:

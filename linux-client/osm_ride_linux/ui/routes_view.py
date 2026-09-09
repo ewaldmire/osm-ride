@@ -1,9 +1,8 @@
 """Mirrors app/src/main/java/com/ewaldmire/osmride/ui/routes/RoutesListScreen.kt: import GPX,
 build routes in-app via BRouter, list routes with distance/climb, rename/delete, tap to ride.
 
-Content only, no header bar of its own - embedded inside RideHubView alongside HistoryView under
-one shared header (with a Routes/History switcher and, only while this tab is active, the
-Create/Import actions). See ride_hub_view.py.
+Content only, no header bar of its own - embedded inside RideHubView, which owns the
+Create/Import actions and header. See ride_hub_view.py.
 """
 
 from __future__ import annotations

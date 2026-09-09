@@ -16,6 +16,8 @@ from dataclasses import dataclass
 
 from fitparse import FitFile
 
+from .activity_type import from_fit_sport
+
 
 @dataclass(frozen=True)
 class FitRidePoint:
@@ -42,6 +44,7 @@ class FitRideSummary:
     avg_cadence_rpm: float | None
     avg_heart_rate_bpm: float | None
     total_calories: float | None
+    activity_type: str
     points: list[FitRidePoint]
 
 
@@ -136,6 +139,7 @@ def _parse(path: str) -> FitRideSummary | None:
     total_calories = session_values.get("total_calories")
     if total_calories is None and avg_power is not None:
         total_calories = avg_power * duration / 1000.0
+    activity_type = from_fit_sport(session_values.get("sport"))
 
     return FitRideSummary(
         start_epoch_seconds=start,
@@ -147,5 +151,6 @@ def _parse(path: str) -> FitRideSummary | None:
         avg_cadence_rpm=avg_cadence,
         avg_heart_rate_bpm=avg_heart_rate,
         total_calories=total_calories,
+        activity_type=activity_type,
         points=points,
     )

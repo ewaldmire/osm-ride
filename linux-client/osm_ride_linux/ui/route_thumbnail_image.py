@@ -49,9 +49,9 @@ class RouteThumbnailImage(Gtk.DrawingArea):
 def build_thumbnail_widget(
     thumb_path: Path | None, width: int, height: int, placeholder_icon_name: str
 ) -> Gtk.Widget:
-    """Shared by RoutesView and HistoryView - both show the same cached route thumbnail at the
-    same size, falling back to a placeholder icon when there isn't one yet (not generated, still
-    generating, or the route predates thumbnails/was deleted)."""
+    """Shared by RoutesView and ActivitiesView - both show the same cached route/activity
+    thumbnail at the same size, falling back to a placeholder icon when there isn't one yet (not
+    generated, still generating, or the route predates thumbnails/was deleted)."""
     if thumb_path is not None and thumb_path.exists():
         thumbnail = RouteThumbnailImage(thumb_path, width, height)
         thumbnail.add_css_class("card")
