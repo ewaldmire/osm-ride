@@ -28,8 +28,8 @@ private val bottomBarTabs = listOf(
 
 /** Persistent bottom navigation shown on every screen except [Destinations.RIDE] (the map/riding
  * screen needs the whole viewport). None of the 4 tabs shows as selected on sub-screens reached
- * from within a tab (Route Creator, Workout Creator, Pairing, Weight, ride Summary) - those keep
- * their own back arrow via their own Scaffold's topBar, nested inside this one. */
+ * from within a tab (Route Creator, Workout Creator, Pairing, Body Metrics, ride Summary) - those
+ * keep their own back arrow via their own Scaffold's topBar, nested inside this one. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OsmRideBottomBar(currentRoute: String?, onNavigate: (String) -> Unit) {

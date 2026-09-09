@@ -40,6 +40,22 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              Lets fosslift (a companion app on the same device) share a completed strength
+              workout in via osmride://import-workout?data=<url-encoded JSON> - see
+              StrengthWorkoutImport.kt for the payload shape. android:host is intentionally not
+              also wildcarded/omitted - only this exact host is a workout import; any other
+              osmride:// deep link added later gets its own host, not folded into this filter.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="osmride"
+                    android:host="import-workout" />
+            </intent-filter>
         </activity>
 
         <!--

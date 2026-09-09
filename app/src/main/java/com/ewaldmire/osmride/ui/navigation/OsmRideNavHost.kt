@@ -1,14 +1,17 @@
 package com.ewaldmire.osmride.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -16,6 +19,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ewaldmire.osmride.OsmRideApp
+import com.ewaldmire.osmride.strength.StrengthWorkoutImport
 import com.ewaldmire.osmride.ui.bodymetrics.BodyMetricsScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.profile.ProfileScreen
@@ -24,9 +29,10 @@ import com.ewaldmire.osmride.ui.ridehub.RideHubScreen
 import com.ewaldmire.osmride.ui.ridehub.RideHubTab
 import com.ewaldmire.osmride.ui.routecreator.RouteCreatorScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
-import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
 import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
+import com.ewaldmire.osmride.ui.workoutshub.WorkoutsHubScreen
+import com.ewaldmire.osmride.ui.workoutshub.WorkoutsHubTab
 
 /** The persistent bottom bar (see [OsmRideBottomBar]) lives on this single outer Scaffold, not
  * on each screen - every screen still keeps its own Scaffold+TopAppBar for its title, nested
@@ -35,16 +41,26 @@ import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
  * (its own top bar), so nesting them is safe. Hidden only on [Destinations.RIDE] - the map needs
  * the full viewport while riding.
  *
- * Only genuine sub-pages (Route Creator, Workout Creator, Pairing, Weight) get a back arrow in
- * their TopAppBar. The four bottom-nav root tabs (Profile, Ride, Workouts, Settings) don't -
+ * Only genuine sub-pages (Route Creator, Workout Creator, Pairing, Body Metrics) get a back arrow
+ * in their TopAppBar. The four bottom-nav root tabs (Profile, Ride, Workouts, Settings) don't -
  * they're reached only via the bottom bar, so a "back" affordance on them was both redundant with
  * it and, worse, always landed on the same fixed screen regardless of which tab the user actually
  * came from (the bottom bar's popUpTo(RIDE_HUB) reset below means popBackStack() on a root tab
- * always resolves to the same anchor, not whatever tab preceded it). */
+ * always resolves to the same anchor, not whatever tab preceded it).
+ *
+ * [pendingWorkoutImportUri] is the osmride://import-workout deep link fosslift launches to share a
+ * completed strength workout in (see MainActivity, which owns intent/onNewIntent handling and
+ * hands the Uri down here as Compose state). Non-null exactly once per share; consumed via
+ * [onPendingWorkoutImportConsumed] so rotation/recomposition doesn't reimport it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
+fun OsmRideNavHost(
+    navController: NavHostController = rememberNavController(),
+    pendingWorkoutImportUri: Uri? = null,
+    onPendingWorkoutImportConsumed: () -> Unit = {},
+) {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val context = LocalContext.current
 
     // One-shot hint for RideHubScreen: which sub-tab to land on next time it's (re)shown. Only
     // the ride-finish flow below ever changes this away from its default - see RideHubScreen's
@@ -52,6 +68,30 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
     // (the RideHubScreen backstack entry is never destroyed/recreated across a ride, so a nav
     // argument's default would only apply on a truly fresh entry, not this one).
     var rideHubInitialTab by remember { mutableStateOf(RideHubTab.Routes) }
+
+    // Same one-shot-hint pattern, for WorkoutsHubScreen - set to Weights right after a fosslift
+    // import lands, below.
+    var workoutsHubInitialTab by remember { mutableStateOf(WorkoutsHubTab.Cycling) }
+
+    LaunchedEffect(pendingWorkoutImportUri) {
+        val uri = pendingWorkoutImportUri ?: return@LaunchedEffect
+        val imported = StrengthWorkoutImport.parse(uri)
+        if (imported != null) {
+            val app = context.applicationContext as OsmRideApp
+            app.strengthWorkoutRepository.addEntry(
+                recordedAtEpochMillis = imported.recordedAtEpochMillis,
+                workoutName = imported.workoutName,
+                exercises = imported.exercises,
+            )
+            workoutsHubInitialTab = WorkoutsHubTab.Weights
+            navController.navigate(Destinations.WORKOUTS_LIST) {
+                popUpTo(Destinations.RIDE_HUB) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+        onPendingWorkoutImportConsumed()
+    }
 
     Scaffold(
         bottomBar = {
@@ -119,7 +159,8 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                 BodyMetricsScreen(onBack = { navController.popBackStack() })
             }
             composable(Destinations.WORKOUTS_LIST) {
-                WorkoutsListScreen(
+                WorkoutsHubScreen(
+                    initialTab = workoutsHubInitialTab,
                     onCreateWorkout = { navController.navigate(Destinations.WORKOUT_CREATOR_NEW) },
                     onEditWorkout = { workoutId -> navController.navigate(Destinations.workoutCreatorEdit(workoutId)) },
                 )
