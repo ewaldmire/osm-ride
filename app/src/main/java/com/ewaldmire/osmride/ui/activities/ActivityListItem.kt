@@ -3,6 +3,7 @@ package com.ewaldmire.osmride.ui.activities
 import com.ewaldmire.osmride.ride.ActivityCategory
 import com.ewaldmire.osmride.ride.RideRecord
 import com.ewaldmire.osmride.strength.StrengthWorkoutEntry
+import com.ewaldmire.osmride.strength.totalVolumeLbs
 
 /** Profile's Activities feed merges two otherwise-unrelated repositories (RideRecord - cycling
  * and, since .fit imports can be anything a bike computer/GPS watch records, other outdoor
@@ -52,12 +53,9 @@ fun computeCategoryBreakdown(rides: List<RideRecord>, strengthEntries: List<Stre
             kilocalories = kilocalories.sum().takeIf { kilocalories.isNotEmpty() },
         )
     }
-    // Top set only (see StrengthExercise) - not the exercise's full set count, so this
-    // undercounts true training volume, but it's the best "total weight moved" proxy the data
-    // this app receives from fosslift actually supports.
-    val totalWeightLiftedLbs = strengthEntries.sumOf { entry ->
-        entry.exercises.sumOf { it.topSetReps * it.topSetWeightLbs }
-    }
+    // Real total training volume (sum of every completed set's reps x weight, see
+    // LiftohistoryImport/StrengthExercise) - not just a top-set proxy.
+    val totalWeightLiftedLbs = strengthEntries.sumOf { it.totalVolumeLbs }
 
     return listOf(
         rideStats(ActivityCategory.FOOT),

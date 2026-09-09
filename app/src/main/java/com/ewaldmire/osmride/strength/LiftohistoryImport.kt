@@ -20,11 +20,11 @@ import java.time.ZoneOffset
  * ```
  *
  * This is a pragmatic subset parser, not a full reimplementation of fosslift's Lezer grammar -
- * osm-ride only needs a date and a top completed set per exercise (see the "lightweight
- * received-log only" scope decision), so warmup/target sections, RPE, timers, set labels,
- * comments, and multi-week program metadata beyond the workout's display name are read past but
- * not otherwise interpreted. Malformed or unrecognized input yields null/empty results rather
- * than throwing - a share that doesn't parse should silently no-op, not crash the app.
+ * osm-ride sums every *completed* set per exercise (total sets/reps/volume, plus the top set for
+ * "best set" display), but warmup/target sections, RPE, timers, set labels, comments, and
+ * multi-week program metadata beyond the workout's display name are read past but not otherwise
+ * interpreted. Malformed or unrecognized input yields null/empty results rather than throwing - a
+ * share that doesn't parse should silently no-op, not crash the app.
  */
 object LiftohistoryImport {
     private val dateRegex = Regex(
@@ -92,7 +92,14 @@ object LiftohistoryImport {
      * either the unlabeled completed-sets list or a "keyword: ..." property (warmup, target,
      * etc.) - the grammar doesn't fix their order, so this looks for the one section without a
      * keyword prefix rather than assuming a position. "/" never appears inside a token per the
-     * grammar's NonSeparator definition, so a plain split is safe. */
+     * grammar's NonSeparator definition, so a plain split is safe.
+     *
+     * Confirmed directly against fosslift's liftohistorySerializer.ts (not just the looser
+     * grammar, which doesn't structurally forbid this): the unlabeled section is always exactly
+     * the full completed working-set list, exactly once, with completed warmup sets always routed
+     * through their own "warmup:" section instead - so summing every group in the unlabeled
+     * section is a safe way to compute real training totals, not a section that could ever also
+     * contain warmup or planned (target) sets. */
     private fun parseExerciseLine(line: String): StrengthExercise? {
         val segments = line.split("/").map { it.trim() }
         val name = segments.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: return null
@@ -103,29 +110,46 @@ object LiftohistoryImport {
         val completedSection = segments.drop(1).firstOrNull { !propertyRegex.matches(it) } ?: return null
 
         val groups = completedSection.split(",").mapNotNull { parseSetGroup(it.trim()) }
+        if (groups.isEmpty()) return null
         // "Top set" = heaviest weight logged, ties broken by more reps at that weight; bodyweight
         // exercises (no weight token at all) fall back to the highest-rep group.
-        val topSet = groups.maxWithOrNull(compareBy({ it.weightLbs ?: -1.0 }, { it.reps })) ?: return null
+        val topSet = groups.maxWith(compareBy({ it.weightLbs ?: -1.0 }, { it.reps }))
 
-        return StrengthExercise(name = name, topSetReps = topSet.reps, topSetWeightLbs = topSet.weightLbs ?: 0.0)
+        return StrengthExercise(
+            name = name,
+            topSetReps = topSet.reps,
+            topSetWeightLbs = topSet.weightLbs ?: 0.0,
+            totalSets = groups.sumOf { it.count },
+            totalReps = groups.sumOf { it.count * it.reps },
+            totalVolumeLbs = groups.sumOf { it.count * it.reps * (it.weightLbs ?: 0.0) },
+        )
     }
 
-    private data class ParsedSet(val reps: Int, val weightLbs: Double?)
+    /** [count] is the "Nx" multiplier - "3x8 185lb" is 3 separate sets of 8 reps each, not one. */
+    private data class ParsedSet(val count: Int, val reps: Int, val weightLbs: Double?)
 
     private fun parseSetGroup(token: String): ParsedSet? {
+        var count = 1
         var reps: Int? = null
         var weightLbs: Double? = null
         for (piece in token.split(Regex("\\s+"))) {
             if (piece.isEmpty()) continue
-            setPartRegex.find(piece)?.let { reps = it.groupValues[2].toInt() }
+            setPartRegex.find(piece)?.let {
+                count = it.groupValues[1].toInt()
+                reps = it.groupValues[2].toInt()
+            }
+            // A leading +/- before the number is a different fosslift grammar feature (relative/
+            // delta weight display) than the trailing "+" (target-only askWeight) below -
+            // confirmed against their serializer that neither ever appears on a completed set, so
+            // this doesn't need to special-case a sign here.
             weightRegex.find(piece)?.let { m ->
                 val value = m.groupValues[1].toDouble()
                 weightLbs = if (m.groupValues[2] == "kg") value * KG_TO_LB else value
             }
             // Rpe ("@N"), SetLabel ("(...)"), and Duration ("Ns") pieces are read past - not
-            // needed for a top-set-only summary.
+            // needed for sets/reps/volume totals.
         }
-        return reps?.let { ParsedSet(it, weightLbs) }
+        return reps?.let { ParsedSet(count, it, weightLbs) }
     }
 }
 

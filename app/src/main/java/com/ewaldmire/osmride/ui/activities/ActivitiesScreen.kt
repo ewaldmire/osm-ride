@@ -57,6 +57,8 @@ import com.ewaldmire.osmride.ride.ActivityType
 import com.ewaldmire.osmride.ride.RideRecord
 import com.ewaldmire.osmride.strength.StrengthExercise
 import com.ewaldmire.osmride.strength.StrengthWorkoutEntry
+import com.ewaldmire.osmride.strength.totalReps
+import com.ewaldmire.osmride.strength.totalVolumeLbs
 import com.ewaldmire.osmride.util.Units
 import java.io.File
 import java.time.Instant
@@ -335,7 +337,11 @@ private fun StrengthActivityCard(entry: StrengthWorkoutEntry, onDelete: () -> Un
                         )
                         Text(entry.workoutName ?: "Workout", style = MaterialTheme.typography.titleMedium)
                     }
-                    Text(formatDate(entry.recordedAtEpochMillis), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${formatDate(entry.recordedAtEpochMillis)} · ${entry.totalReps} reps · " +
+                            "${formatStrengthWeight(entry.totalVolumeLbs)} volume",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete workout")
@@ -346,19 +352,28 @@ private fun StrengthActivityCard(entry: StrengthWorkoutEntry, onDelete: () -> Un
     }
 }
 
+/** Per exercise: name + total sets/reps on the main line, top set + that exercise's own volume
+ * as a secondary line - fosslift's liftohistory text only carries completed-set *groups* ("3x8
+ * 185lb"), not a full per-rep log, so these totals (see StrengthExercise/LiftohistoryImport) are
+ * the most detailed real breakdown this data supports. */
 @Composable
 private fun StrengthExerciseRow(exercise: StrengthExercise) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                exercise.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            Text("${exercise.totalSets} × ${exercise.totalReps} reps", style = MaterialTheme.typography.bodyMedium)
+        }
         Text(
-            exercise.name,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(end = 8.dp),
-        )
-        Text(
-            "${exercise.topSetReps} × ${formatStrengthWeight(exercise.topSetWeightLbs)}",
-            style = MaterialTheme.typography.bodyMedium,
+            "Top set ${exercise.topSetReps} × ${formatStrengthWeight(exercise.topSetWeightLbs)} · " +
+                "${formatStrengthWeight(exercise.totalVolumeLbs)} volume",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
