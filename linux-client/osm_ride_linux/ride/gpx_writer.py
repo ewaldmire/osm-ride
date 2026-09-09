@@ -14,7 +14,7 @@ from .models import RecordedTrackPoint
 def write(ride_name: str, points: list[RecordedTrackPoint]) -> str:
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<gpx version="1.1" creator="OSM Ride" '
+        '<gpx version="1.1" creator="Oath Strong" '
         'xmlns="http://www.topografix.com/GPX/1/1" '
         'xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">',
         "  <trk>",

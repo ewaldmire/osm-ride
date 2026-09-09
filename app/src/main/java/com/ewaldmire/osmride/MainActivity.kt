@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
      *    intent-filter and FitFileImporter.kt.
      *  - SEND_MULTIPLE, same as SEND but with EXTRA_STREAM as an ArrayList - some apps (Wahoo's
      *    ELEMNT app among them) always use the multi-file share path even for a single file. Only
-     *    the first file is imported; OSM Ride only ever saves one ride from a share. */
+     *    the first file is imported; Oath Strong only ever saves one ride from a share. */
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         when (intent.action) {

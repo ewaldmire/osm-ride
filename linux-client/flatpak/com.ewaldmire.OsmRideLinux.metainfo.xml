@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>com.ewaldmire.OsmRideLinux</id>
-  <name>OSM Ride</name>
+  <name>Oath Strong</name>
   <summary>Indoor trainer companion with live GPX route replay</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <!-- No LICENSE file exists in the source repo yet, so this is left unset rather than
@@ -12,12 +12,12 @@
   </developer>
   <description>
     <p>
-      OSM Ride connects to a BLE smart trainer (FTMS or CSC) and replays a pre-loaded GPX route
+      Oath Strong connects to a BLE smart trainer (FTMS or CSC) and replays a pre-loaded GPX route
       on a 3D map as you pedal, tracking distance, power, cadence, and heart rate. Structured
       .erg/.mrc/.zwo workouts drive ERG mode, and finished rides export as GPX for Strava.
     </p>
     <p>
-      This is the Linux desktop counterpart to the OSM Ride Android app, sharing the same BLE
+      This is the Linux desktop counterpart to the Oath Strong Android app, sharing the same BLE
       protocol handling and file formats.
     </p>
   </description>

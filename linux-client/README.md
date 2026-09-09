@@ -1,4 +1,4 @@
-# OSM Ride - Linux client
+# Oath Strong - Linux client
 
 A desktop companion to the Android app, for riding with a BLE smart trainer from a Linux machine
 (e.g. one wired to a TV) instead of a phone. Same trainer protocol, same GPX/workout file formats

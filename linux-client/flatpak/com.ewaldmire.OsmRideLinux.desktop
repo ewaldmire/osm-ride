@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=OSM Ride
+Name=Oath Strong
 Comment=Indoor trainer companion: BLE connectivity, live GPX route replay, ERG workouts
 Exec=osm-ride-linux
 Icon=com.ewaldmire.OsmRideLinux

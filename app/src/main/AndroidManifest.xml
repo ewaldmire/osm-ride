@@ -60,7 +60,7 @@
             </intent-filter>
 
             <!--
-              Lets OSM Ride show up in the OS Sharesheet when another app (a bike computer's
+              Lets Oath Strong show up in the OS Sharesheet when another app (a bike computer's
               companion app - e.g. Wahoo ELEMNT - or a file manager) shares a .fit file - see
               MainActivity's ACTION_SEND/ACTION_SEND_MULTIPLE handling/FitFileImporter.kt.
               message/rfc822 - confirmed on-device via a temporary diagnostic Toast (since

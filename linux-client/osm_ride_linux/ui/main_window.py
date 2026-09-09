@@ -40,7 +40,7 @@ from .workouts_view import WorkoutsView
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, app) -> None:  # noqa: ANN001 - OsmRideApplication, avoiding an import cycle
-        super().__init__(application=app, title="OSM Ride", default_width=1000, default_height=700)
+        super().__init__(application=app, title="Oath Strong", default_width=1000, default_height=700)
         self.app = app
 
         self.stack = Adw.ViewStack()

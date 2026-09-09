@@ -12,7 +12,7 @@ object GpxWriter {
         val sb = StringBuilder()
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         sb.append(
-            "<gpx version=\"1.1\" creator=\"OSM Ride\" " +
+            "<gpx version=\"1.1\" creator=\"Oath Strong\" " +
                 "xmlns=\"http://www.topografix.com/GPX/1/1\" " +
                 "xmlns:gpxtpx=\"http://www.garmin.com/xmlschemas/TrackPointExtension/v1\">\n",
         )

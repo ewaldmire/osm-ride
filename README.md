@@ -1,4 +1,4 @@
-# OSM Ride
+# Oath Strong
 
 An Android app for indoor cycling trainers: pick a preplanned GPX route, connect your smart
 trainer (and optionally a heart rate monitor) over Bluetooth LE, and watch a bike avatar move
