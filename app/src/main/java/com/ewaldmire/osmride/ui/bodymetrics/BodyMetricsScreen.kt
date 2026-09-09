@@ -299,7 +299,7 @@ private fun WaistTab(
 @Composable
 private fun BodyFatEstimateCard(viewModel: BodyMetricsViewModel) {
     var neckInput by remember { mutableStateOf(viewModel.getNeckCm()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
-    var heightInput by remember { mutableStateOf(viewModel.getHeightCm()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
+    var heightInput by remember { mutableStateOf(viewModel.getHeightInches()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
     val bodyFatPercent = viewModel.estimateBodyFatPercent()
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -325,9 +325,9 @@ private fun BodyFatEstimateCard(viewModel: BodyMetricsViewModel) {
                     value = heightInput,
                     onValueChange = { text ->
                         heightInput = text.filter { it.isDigit() || it == '.' }
-                        viewModel.setHeightCm(heightInput.toDoubleOrNull())
+                        viewModel.setHeightInches(heightInput.toDoubleOrNull())
                     },
-                    label = { Text("Height (cm)") },
+                    label = { Text("Height (in)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),

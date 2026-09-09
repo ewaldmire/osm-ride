@@ -304,10 +304,10 @@ class BodyMetricsView(ToolbarPage):
         self._neck_row.connect("changed", self._on_neck_changed)
         group.add(self._neck_row)
 
-        self._height_row = Adw.EntryRow(title="Height (cm)")
+        self._height_row = Adw.EntryRow(title="Height (in)")
         height_cm = self._prefs.get_height_cm()
         if height_cm is not None:
-            self._height_row.set_text(f"{height_cm:.1f}")
+            self._height_row.set_text(f"{units.cm_to_inches(height_cm):.1f}")
         self._height_row.connect("changed", self._on_height_changed)
         group.add(self._height_row)
 
@@ -334,7 +334,8 @@ class BodyMetricsView(ToolbarPage):
         if digits != text:
             entry.set_text(digits)
             return
-        self._prefs.set_height_cm(_to_double_or_none(digits))
+        inches = _to_double_or_none(digits)
+        self._prefs.set_height_cm(units.inches_to_cm(inches) if inches else None)
         self._refresh_body_fat_estimate()
 
     def _refresh_body_fat_estimate(self) -> None:

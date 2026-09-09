@@ -2,20 +2,26 @@ package com.ewaldmire.osmride.util
 
 import java.util.Locale
 
-/** Formatting helpers — the app displays imperial units throughout (distance, weight), except
- * waist/neck/height, which are shown in centimeters per user preference even though they're
- * stored in the same unit anyway, so there's no conversion to do for those. */
+/** Formatting helpers — the app displays imperial units throughout (distance, weight, height),
+ * except waist/neck, which are shown in centimeters per user preference (common in fitness
+ * contexts for circumference measurements, even for someone who otherwise thinks in feet/inches
+ * for height). Waist/neck are stored in cm already, so no conversion is needed for those; height
+ * is stored in cm for the Navy body-fat formula's sake but displayed in inches, so it does need
+ * the round trip. */
 object Units {
     private const val METERS_PER_MILE = 1609.344
     private const val METERS_PER_FOOT = 0.3048
     private const val MPS_TO_MPH = 2.2369362921
     private const val LB_PER_KG = 2.2046226218
+    private const val CM_PER_INCH = 2.54
 
     fun metersToMiles(meters: Double): Double = meters / METERS_PER_MILE
     fun metersToFeet(meters: Double): Double = meters / METERS_PER_FOOT
     fun mpsToMph(metersPerSecond: Double): Double = metersPerSecond * MPS_TO_MPH
     fun kgToLbs(kg: Double): Double = kg * LB_PER_KG
     fun lbsToKg(lbs: Double): Double = lbs / LB_PER_KG
+    fun cmToInches(cm: Double): Double = cm / CM_PER_INCH
+    fun inchesToCm(inches: Double): Double = inches * CM_PER_INCH
 
     fun formatMiles(meters: Double): String = String.format(Locale.US, "%.2f mi", metersToMiles(meters))
     fun formatFeet(meters: Double): String = String.format(Locale.US, "%.0f ft", metersToFeet(meters))

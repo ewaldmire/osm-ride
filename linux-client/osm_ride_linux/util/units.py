@@ -1,6 +1,8 @@
-"""Formatting helpers - the app displays imperial units throughout (distance, weight), except
-waist/neck/height, which are shown in centimeters per user preference even though they're stored
-in the same unit anyway, so there's no conversion to do for those.
+"""Formatting helpers - the app displays imperial units throughout (distance, weight, height),
+except waist/neck, which are shown in centimeters per user preference (common in fitness contexts
+for circumference measurements, even for someone who otherwise thinks in feet/inches for height).
+Waist/neck are stored in cm already, so no conversion is needed for those; height is stored in cm
+for the Navy body-fat formula's sake but displayed in inches, so it does need the round trip.
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/util/Units.kt.
 """
@@ -11,6 +13,7 @@ _METERS_PER_MILE = 1609.344
 _METERS_PER_FOOT = 0.3048
 _MPS_TO_MPH = 2.2369362921
 _LB_PER_KG = 2.2046226218
+_CM_PER_INCH = 2.54
 
 
 def meters_to_miles(meters: float) -> float:
@@ -31,6 +34,14 @@ def kg_to_lbs(kg: float) -> float:
 
 def lbs_to_kg(lbs: float) -> float:
     return lbs / _LB_PER_KG
+
+
+def cm_to_inches(cm: float) -> float:
+    return cm / _CM_PER_INCH
+
+
+def inches_to_cm(inches: float) -> float:
+    return inches * _CM_PER_INCH
 
 
 def format_miles(meters: float) -> str:

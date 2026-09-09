@@ -47,10 +47,10 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
         SettingsPrefs.setNeckCm(app, cm)
     }
 
-    fun getHeightCm(): Double? = SettingsPrefs.getHeightCm(app)
+    fun getHeightInches(): Double? = SettingsPrefs.getHeightCm(app)?.let { Units.cmToInches(it) }
 
-    fun setHeightCm(cm: Double?) {
-        SettingsPrefs.setHeightCm(app, cm)
+    fun setHeightInches(inches: Double?) {
+        SettingsPrefs.setHeightCm(app, inches?.let { Units.inchesToCm(it) })
     }
 
     /** Null if there's no waist entry yet, or neck/height haven't been entered. */
