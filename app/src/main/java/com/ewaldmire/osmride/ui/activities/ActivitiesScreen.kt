@@ -62,6 +62,7 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy · h:mm a")
 
@@ -194,39 +195,45 @@ private fun CategoryBreakdownCard(rides: List<RideRecord>, strengthEntries: List
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("By Category", style = MaterialTheme.typography.titleMedium)
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             stats.forEach { CategoryStatsRow(it) }
         }
     }
 }
 
+/** One compact line per category - icon, label+count, then whatever stats apply (nothing else
+ * fits on one line once weight/distance/time/calories are all in play across 4 different
+ * categories, so this deliberately doesn't try to line up into columns). */
 @Composable
 private fun CategoryStatsRow(stats: CategoryStats) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
-                categoryIcon(stats.category),
-                contentDescription = categoryLabel(stats.category),
-                modifier = Modifier.size(20.dp).padding(end = 8.dp),
-            )
-            Text("${categoryLabel(stats.category)} (${stats.count})", style = MaterialTheme.typography.bodyMedium)
-        }
-        // Distance/time/calories don't exist for a shared-in strength workout (no such data is
-        // tracked), so that row is just the count above - nothing else to show here for it.
-        if (stats.category != ActivityCategory.STRENGTH) {
-            Text(
-                "${Units.formatMiles(stats.distanceMeters)} · ${Units.formatDuration(stats.durationSeconds)} · " +
-                    Units.formatKilocalories(stats.kilocalories),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+        Icon(
+            categoryIcon(stats.category),
+            contentDescription = categoryLabel(stats.category),
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            "${categoryLabel(stats.category)} (${stats.count})",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(start = 6.dp).weight(1f),
+        )
+        Text(categoryStatsText(stats), style = MaterialTheme.typography.bodySmall)
     }
 }
+
+/** Distance/time/calories don't exist for a shared-in strength workout (no such data is
+ * tracked) - total weight lifted (see [computeCategoryBreakdown]) stands in for that row instead. */
+private fun categoryStatsText(stats: CategoryStats): String =
+    if (stats.category == ActivityCategory.STRENGTH) {
+        String.format(Locale.US, "%.2f lbs", stats.totalWeightLiftedLbs ?: 0.0)
+    } else {
+        "${Units.formatMiles(stats.distanceMeters)} · ${Units.formatDuration(stats.durationSeconds)} · " +
+            Units.formatKilocalories(stats.kilocalories)
+    }
 
 @Composable
 private fun RideActivityCard(

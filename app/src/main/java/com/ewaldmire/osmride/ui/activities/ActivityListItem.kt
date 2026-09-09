@@ -27,13 +27,14 @@ fun mergeActivities(rides: List<RideRecord>, strengthEntries: List<StrengthWorko
 
 /** One row of the Activities feed's summary breakdown - a per-[ActivityCategory] rollup. Distance/
  * duration/calories are meaningless for STRENGTH (no such data is tracked for a shared-in
- * workout), so those stay at zero/null and the card just shows [count] for that row. */
+ * workout) - that row uses [totalWeightLiftedLbs] instead, everyone else leaves it null. */
 data class CategoryStats(
     val category: ActivityCategory,
     val count: Int,
     val distanceMeters: Double,
     val durationSeconds: Long,
     val kilocalories: Double?,
+    val totalWeightLiftedLbs: Double? = null,
 )
 
 /** Foot/Strength/Wheel/Water, in that display order - see [ActivityCategory]'s own doc comment
@@ -51,10 +52,23 @@ fun computeCategoryBreakdown(rides: List<RideRecord>, strengthEntries: List<Stre
             kilocalories = kilocalories.sum().takeIf { kilocalories.isNotEmpty() },
         )
     }
+    // Top set only (see StrengthExercise) - not the exercise's full set count, so this
+    // undercounts true training volume, but it's the best "total weight moved" proxy the data
+    // this app receives from fosslift actually supports.
+    val totalWeightLiftedLbs = strengthEntries.sumOf { entry ->
+        entry.exercises.sumOf { it.topSetReps * it.topSetWeightLbs }
+    }
 
     return listOf(
         rideStats(ActivityCategory.FOOT),
-        CategoryStats(ActivityCategory.STRENGTH, strengthEntries.size, 0.0, 0, null),
+        CategoryStats(
+            category = ActivityCategory.STRENGTH,
+            count = strengthEntries.size,
+            distanceMeters = 0.0,
+            durationSeconds = 0,
+            kilocalories = null,
+            totalWeightLiftedLbs = totalWeightLiftedLbs,
+        ),
         rideStats(ActivityCategory.WHEEL),
         rideStats(ActivityCategory.WATER),
     )
