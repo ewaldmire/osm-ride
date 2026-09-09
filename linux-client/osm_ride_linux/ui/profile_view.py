@@ -1,6 +1,6 @@
 """Personal "about you" data used elsewhere in the app - FTP (for %FTP-based workouts) and
-weight (its own tracking screen, see weight_view.py) - as opposed to Settings, which is just app
-configuration (Bluetooth pairing).
+weight/waist (their own tracking screen, see body_metrics_view.py) - as opposed to Settings, which
+is just app configuration (Bluetooth pairing).
 
 Mirrors app/src/main/java/com/ewaldmire/osmride/ui/profile/ProfileScreen.kt.
 """
@@ -24,6 +24,7 @@ class ProfileView(ToolbarPage):
         super().__init__()
         self.window = window
         self._weight_repo = window.app.weight_repository
+        self._waist_repo = window.app.waist_repository
         app = window.app
 
         self.add_top_bar(
@@ -36,12 +37,12 @@ class ProfileView(ToolbarPage):
 
         page = Adw.PreferencesPage()
 
-        weight_group = Adw.PreferencesGroup()
-        self._weight_row = Adw.ActionRow(title="Weight", activatable=True)
-        self._weight_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
-        self._weight_row.connect("activated", lambda _r: window.show_weight())
-        weight_group.add(self._weight_row)
-        page.add(weight_group)
+        body_metrics_group = Adw.PreferencesGroup()
+        self._body_metrics_row = Adw.ActionRow(title="Body Metrics", activatable=True)
+        self._body_metrics_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        self._body_metrics_row.connect("activated", lambda _r: window.show_body_metrics())
+        body_metrics_group.add(self._body_metrics_row)
+        page.add(body_metrics_group)
 
         training_group = Adw.PreferencesGroup(
             title="Training",
@@ -57,21 +58,26 @@ class ProfileView(ToolbarPage):
 
         self.set_content(page)
 
-        # Not a persistent self._weight_repo.on_entries_changed subscription - WeightView already
-        # owns that single-subscriber callback slot for its own list/chart. MainWindow.show_
+        # Not a persistent on_entries_changed subscription - BodyMetricsView already owns that
+        # single-subscriber callback slot on each repo for its own list/chart. MainWindow.show_
         # profile() calls this directly instead, same lazy-refresh-on-navigate pattern already
         # used elsewhere (e.g. RouteCreatorView.start_edit()).
-        self.refresh_weight_summary()
+        self.refresh_body_metrics_summary()
 
-    def refresh_weight_summary(self) -> None:
-        entries = self._weight_repo.entries
-        if entries:
-            latest = entries[0]
-            self._weight_row.set_subtitle(
-                f"{units.format_weight_lbs(latest.weight_kg)} · {self._format_date(latest.recorded_at_epoch_millis)}"
-            )
-        else:
-            self._weight_row.set_subtitle("No weigh-ins logged yet")
+    def refresh_body_metrics_summary(self) -> None:
+        latest_weight = self._weight_repo.entries[0] if self._weight_repo.entries else None
+        latest_waist = self._waist_repo.entries[0] if self._waist_repo.entries else None
+        self._body_metrics_row.set_subtitle(self._body_metrics_summary(latest_weight, latest_waist))
+
+    def _body_metrics_summary(self, latest_weight, latest_waist) -> str:  # noqa: ANN001 - WeightEntry | None, WaistEntry | None
+        if latest_weight is None and latest_waist is None:
+            return "No measurements logged yet"
+        parts = []
+        if latest_weight is not None:
+            parts.append(f"Weight {units.format_weight_lbs(latest_weight.weight_kg)}")
+        if latest_waist is not None:
+            parts.append(f"Waist {units.format_waist_inches(latest_waist.waist_cm)}")
+        return " · ".join(parts)
 
     def _format_date(self, epoch_millis: int) -> str:
         dt = datetime.datetime.fromtimestamp(epoch_millis / 1000)

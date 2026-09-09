@@ -1,4 +1,4 @@
-"""Mirrors app/src/main/java/com/ewaldmire/osmride/weight/WeightEntry.kt."""
+"""Mirrors app/src/main/java/com/ewaldmire/osmride/weight/WeightEntry.kt and WaistEntry.kt."""
 
 from __future__ import annotations
 
@@ -13,4 +13,14 @@ class WeightEntry:
 
     id: str
     weight_kg: float
+    recorded_at_epoch_millis: int
+
+
+@dataclass
+class WaistEntry:
+    """A single logged waist measurement - the primary "visible abs" signal, alongside weight.
+    Stored in cm for the same metric-internal/imperial-display reason as WeightEntry."""
+
+    id: str
+    waist_cm: float
     recorded_at_epoch_millis: int

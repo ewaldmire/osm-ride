@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ui.settings.SettingsPrefs
 import com.ewaldmire.osmride.util.Units
+import com.ewaldmire.osmride.weight.WaistEntry
+import com.ewaldmire.osmride.weight.WeightEntry
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -38,18 +40,20 @@ import java.time.format.DateTimeFormatter
 private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
 
 /** Personal "about you" data used elsewhere in the app - FTP (for %FTP-based workouts) and
- * weight (its own tracking screen, see WeightScreen) - as opposed to Settings, which is just app
- * configuration (Bluetooth pairing). */
+ * weight/waist (their own tracking screen, see BodyMetricsScreen) - as opposed to Settings, which
+ * is just app configuration (Bluetooth pairing). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    onOpenWeight: () -> Unit,
+    onOpenBodyMetrics: () -> Unit,
     viewModel: ProfileViewModel = viewModel(),
 ) {
     val context = LocalContext.current
     var ftpText by remember { mutableStateOf(SettingsPrefs.getFtpWatts(context)?.toString() ?: "") }
     val weightEntries by viewModel.weightEntries.collectAsState()
+    val waistEntries by viewModel.waistEntries.collectAsState()
     val latestWeight = weightEntries.firstOrNull()
+    val latestWaist = waistEntries.firstOrNull()
 
     Scaffold(
         topBar = {
@@ -70,7 +74,7 @@ fun ProfileScreen(
             modifier = Modifier.padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Card(onClick = onOpenWeight, modifier = Modifier.fillMaxWidth()) {
+            Card(onClick = onOpenBodyMetrics, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -79,14 +83,9 @@ fun ProfileScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Filled.MonitorWeight, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
                         Column {
-                            Text("Weight", style = MaterialTheme.typography.titleMedium)
+                            Text("Body Metrics", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                if (latestWeight != null) {
-                                    "${Units.formatWeightLbs(latestWeight.weightKg)} · " +
-                                        formatDate(latestWeight.recordedAtEpochMillis)
-                                } else {
-                                    "No weigh-ins logged yet"
-                                },
+                                bodyMetricsSummary(latestWeight, latestWaist),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -114,3 +113,11 @@ fun ProfileScreen(
 
 private fun formatDate(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
+
+private fun bodyMetricsSummary(latestWeight: WeightEntry?, latestWaist: WaistEntry?): String {
+    if (latestWeight == null && latestWaist == null) return "No measurements logged yet"
+    val parts = mutableListOf<String>()
+    latestWeight?.let { parts.add("Weight ${Units.formatWeightLbs(it.weightKg)}") }
+    latestWaist?.let { parts.add("Waist ${Units.formatWaistInches(it.waistCm)}") }
+    return parts.joinToString(" · ")
+}

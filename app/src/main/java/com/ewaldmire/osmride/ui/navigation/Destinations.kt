@@ -14,7 +14,7 @@ object Destinations {
     const val ROUTE_CREATOR_NEW = "route_creator"
     const val WORKOUT_CREATOR = "workout_creator?workoutId={workoutId}"
     const val WORKOUT_CREATOR_NEW = "workout_creator"
-    const val WEIGHT = "weight"
+    const val BODY_METRICS = "body_metrics"
 
     fun ride(routeId: String) = "ride/$routeId"
 

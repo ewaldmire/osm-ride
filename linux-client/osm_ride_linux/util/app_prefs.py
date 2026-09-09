@@ -1,8 +1,8 @@
-"""Small persisted settings: FTP (mirrors SettingsPrefs.kt) and the last-connected BLE device
-addresses (mirrors the "ble_devices" SharedPreferences read directly in
-DevicePairingViewModel.kt). Consolidated into one JSON file under $XDG_CONFIG_HOME - Python has
-no equivalent to Android's per-feature SharedPreferences-file convention, and there's no reason
-to split what's really just a handful of small values."""
+"""Small persisted settings: FTP, neck/height for the Navy body-fat estimate (mirrors
+SettingsPrefs.kt), and the last-connected BLE device addresses (mirrors the "ble_devices"
+SharedPreferences read directly in DevicePairingViewModel.kt). Consolidated into one JSON file
+under $XDG_CONFIG_HOME - Python has no equivalent to Android's per-feature SharedPreferences-file
+convention, and there's no reason to split what's really just a handful of small values."""
 
 from __future__ import annotations
 
@@ -42,6 +42,20 @@ class AppPrefs:
 
     def set_hr_address(self, address: str | None) -> None:
         self._set_or_remove("hr_address", address)
+
+    def get_neck_cm(self) -> float | None:
+        value = self._data.get("neck_cm")
+        return value if isinstance(value, (int, float)) and value > 0 else None
+
+    def set_neck_cm(self, cm: float | None) -> None:
+        self._set_or_remove("neck_cm", cm if cm and cm > 0 else None)
+
+    def get_height_cm(self) -> float | None:
+        value = self._data.get("height_cm")
+        return value if isinstance(value, (int, float)) and value > 0 else None
+
+    def set_height_cm(self, cm: float | None) -> None:
+        self._set_or_remove("height_cm", cm if cm and cm > 0 else None)
 
     def _set_or_remove(self, key: str, value) -> None:  # noqa: ANN001
         if value is None:

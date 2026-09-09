@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ewaldmire.osmride.ui.bodymetrics.BodyMetricsScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.profile.ProfileScreen
 import com.ewaldmire.osmride.ui.ride.RideScreen
@@ -25,7 +26,6 @@ import com.ewaldmire.osmride.ui.routecreator.RouteCreatorScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
 import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
-import com.ewaldmire.osmride.ui.weight.WeightScreen
 import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
 
 /** The persistent bottom bar (see [OsmRideBottomBar]) lives on this single outer Scaffold, not
@@ -107,7 +107,7 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
             }
             composable(Destinations.PROFILE) {
                 ProfileScreen(
-                    onOpenWeight = { navController.navigate(Destinations.WEIGHT) },
+                    onOpenBodyMetrics = { navController.navigate(Destinations.BODY_METRICS) },
                 )
             }
             composable(Destinations.SETTINGS) {
@@ -115,8 +115,8 @@ fun OsmRideNavHost(navController: NavHostController = rememberNavController()) {
                     onOpenPairing = { navController.navigate(Destinations.PAIRING) },
                 )
             }
-            composable(Destinations.WEIGHT) {
-                WeightScreen(onBack = { navController.popBackStack() })
+            composable(Destinations.BODY_METRICS) {
+                BodyMetricsScreen(onBack = { navController.popBackStack() })
             }
             composable(Destinations.WORKOUTS_LIST) {
                 WorkoutsListScreen(

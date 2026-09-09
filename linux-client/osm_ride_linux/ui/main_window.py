@@ -2,13 +2,13 @@
 built-in Adw.ViewSwitcherBar as the persistent bottom tab bar - hidden only on "ride" (the map
 needs the full window while riding). Only the four tab screens (Profile/Ride/Workouts/Settings)
 are added with add_titled_with_icon() so they get a switcher button; sub-screens (Pairing,
-Weight, Ride, the two Creators) are added with add_named() so the stack can navigate to them
+Body Metrics, Ride, the two Creators) are added with add_named() so the stack can navigate to them
 without the switcher ever showing a button - and without highlighting any tab - for them, mirroring
 the "no tab active on sub-screens" behavior the GTK3 version's custom bar had.
 
 "Ride" (add_titled "ride_hub") combines the old separate History/Routes tabs behind one Routes/
 History switcher (see ride_hub_view.py) - both are "things you do with your rides", not two
-distinct app areas. "Profile" (FTP + weight, see profile_view.py) replaced History as a top-level
+distinct app areas. "Profile" (FTP + weight/waist, see profile_view.py) replaced History as a top-level
 tab - that's personal "about you" data, not app configuration, so it doesn't belong in Settings
 either.
 
@@ -26,6 +26,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw  # noqa: E402
 
+from .body_metrics_view import BodyMetricsView
 from .pairing_view import PairingView
 from .profile_view import ProfileView
 from .ride_hub_view import RideHubView
@@ -33,7 +34,6 @@ from .ride_summary_view import RideSummaryView
 from .ride_view import RideView
 from .route_creator_view import RouteCreatorView
 from .settings_view import SettingsView
-from .weight_view import WeightView
 from .workout_creator_view import WorkoutCreatorView
 from .workouts_view import WorkoutsView
 
@@ -62,8 +62,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.pairing_view = PairingView(self)
         self.stack.add_named(self.pairing_view, "pairing")
 
-        self.weight_view = WeightView(self)
-        self.stack.add_named(self.weight_view, "weight")
+        self.body_metrics_view = BodyMetricsView(self)
+        self.stack.add_named(self.body_metrics_view, "body_metrics")
 
         self.ride_view = RideView(self)
         self.stack.add_named(self.ride_view, "ride")
@@ -94,7 +94,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.view_switcher_bar.set_reveal(name != "ride")
 
     def show_profile(self) -> None:
-        self.profile_view.refresh_weight_summary()
+        self.profile_view.refresh_body_metrics_summary()
         self.stack.set_visible_child_name("profile")
 
     def show_settings(self) -> None:
@@ -107,12 +107,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.pairing_view.on_back = on_back or self.show_settings
         self.stack.set_visible_child_name("pairing")
 
-    def show_weight(self, on_back: Callable[[], None] | None = None) -> None:
-        # Defaults to Profile (where Weight is normally opened from); the ride screen's "not
+    def show_body_metrics(self, on_back: Callable[[], None] | None = None) -> None:
+        # Defaults to Profile (where Body Metrics is normally opened from); the ride screen's "not
         # connected"-style status isn't relevant here, but the override exists for the same
         # reason it does on show_pairing - some future caller may need somewhere else to return to.
-        self.weight_view.on_back = on_back or self.show_profile
-        self.stack.set_visible_child_name("weight")
+        self.body_metrics_view.on_back = on_back or self.show_profile
+        self.stack.set_visible_child_name("body_metrics")
 
     def show_routes(self) -> None:
         self.ride_hub_view.show_routes_tab()

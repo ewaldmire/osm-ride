@@ -19,6 +19,7 @@ from ..route.repository import RouteRepository
 from ..util.app_prefs import AppPrefs
 from ..util.async_bridge import AsyncBridge
 from ..weight.repository import WeightRepository
+from ..weight.waist_repository import WaistRepository
 from .main_window import MainWindow
 
 
@@ -31,6 +32,7 @@ class OsmRideApplication(Adw.Application):
         self.workout_repository = WorkoutRepository()
         self.history_repository = RideHistoryRepository()
         self.weight_repository = WeightRepository()
+        self.waist_repository = WaistRepository()
         self.trainer_client = TrainerClient()
         self.heart_rate_client = HeartRateClient()
         self._window: MainWindow | None = None
