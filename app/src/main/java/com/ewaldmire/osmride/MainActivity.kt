@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -72,15 +71,10 @@ class MainActivity : ComponentActivity() {
                 intent.data?.let { pendingWorkoutImportUri = it }
             }
             Intent.ACTION_SEND -> {
-                // TEMPORARY - remove once the sending app's real MIME type is known, so the
-                // manifest's currently-wildcarded */* filter can be narrowed to it instead.
-                Toast.makeText(this, "OSM Ride received SEND with type: ${intent.type}", Toast.LENGTH_LONG).show()
                 val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return
                 pendingFitShare = PendingFitShare(uri, queryDisplayName(uri))
             }
             Intent.ACTION_SEND_MULTIPLE -> {
-                // TEMPORARY - see above.
-                Toast.makeText(this, "OSM Ride received SEND_MULTIPLE with type: ${intent.type}", Toast.LENGTH_LONG).show()
                 val uri = IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                     ?.firstOrNull() ?: return
                 pendingFitShare = PendingFitShare(uri, queryDisplayName(uri))
