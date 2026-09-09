@@ -88,15 +88,19 @@ object LiftohistoryImport {
     private fun extractQuoted(text: String, key: String): String? =
         Regex("""$key:\s*"([^"]*)"""").find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
 
-    /** One line looks like `ExerciseName / <completed sets> [/ warmup: ...] [/ target: ...]` -
-     * the completed-sets section is always the first "/"-separated segment after the name (see
-     * liftohistorySerializer.ts's serializeEntry - completed comes before warmup/target, and
-     * every emitted exercise line has at least one completed set by construction). "/" never
-     * appears inside a token per the grammar's NonSeparator definition, so a plain split is safe. */
+    /** One line looks like `ExerciseName / <sections...>`, where each section after the name is
+     * either the unlabeled completed-sets list or a "keyword: ..." property (warmup, target,
+     * etc.) - the grammar doesn't fix their order, so this looks for the one section without a
+     * keyword prefix rather than assuming a position. "/" never appears inside a token per the
+     * grammar's NonSeparator definition, so a plain split is safe. */
     private fun parseExerciseLine(line: String): StrengthExercise? {
         val segments = line.split("/").map { it.trim() }
         val name = segments.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: return null
-        val completedSection = segments.getOrNull(1)?.takeIf { !propertyRegex.matches(it) } ?: return null
+        // fosslift's own grammar allows ExerciseSections (completed sets, "warmup:", "target:",
+        // etc.) in any order - CompletedSets is just whichever section has no "keyword:" prefix.
+        // Don't assume it's always the first section after the name; find it by shape instead, so
+        // this keeps working if fosslift's serializer ever changes the order it emits in.
+        val completedSection = segments.drop(1).firstOrNull { !propertyRegex.matches(it) } ?: return null
 
         val groups = completedSection.split(",").mapNotNull { parseSetGroup(it.trim()) }
         // "Top set" = heaviest weight logged, ties broken by more reps at that weight; bodyweight
