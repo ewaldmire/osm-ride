@@ -60,21 +60,25 @@ enum class ProfileTab { Activities, Metrics }
  * imports could be non-cycling activities.
  *
  * [initialTab] is a one-shot hint, not a persistent nav argument - mirrors RideHubScreen's own
- * former doc comment on the same pattern. It's how an incoming .fit-Sharesheet import or a
- * fosslift strength-workout share (OsmRideNavHost) lands here on the Activities sub-tab
- * specifically.
+ * former doc comment on the same pattern. It's how an incoming .fit-Sharesheet import, a fosslift
+ * strength-workout share, or finishing a live ride (OsmRideNavHost) lands here on the Activities
+ * sub-tab specifically. [initialTabRequestId] is keyed on instead of [initialTab] itself so the
+ * effect below reliably re-fires even when two requests in a row ask for the same tab (e.g. two
+ * rides finished back to back) - a plain value key wouldn't change on the second request, so
+ * nothing would force the switch back if the rider had manually flipped to Metrics in between.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     initialTab: ProfileTab,
+    initialTabRequestId: Int = 0,
     onOpenBodyMetrics: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel(),
     activitiesViewModel: ActivitiesViewModel = viewModel(),
 ) {
     val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableStateOf(initialTab) }
-    LaunchedEffect(initialTab) { selectedTab = initialTab }
+    LaunchedEffect(initialTabRequestId) { selectedTab = initialTab }
 
     val importError by activitiesViewModel.importError.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }

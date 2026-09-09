@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.ewaldmire.osmride.ride.ActivityCategory
 import com.ewaldmire.osmride.ride.ActivityType
 import com.ewaldmire.osmride.ride.RideRecord
 import com.ewaldmire.osmride.strength.StrengthExercise
@@ -108,12 +109,7 @@ fun ActivitiesContent(padding: PaddingValues, viewModel: ActivitiesViewModel) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Ride-only totals (distance/speed don't mean anything for a strength session) -
-            // still worth showing since rides are the overwhelming majority of most people's
-            // activity history.
-            if (rides.isNotEmpty()) {
-                item(key = "overview") { OverviewCard(rides) }
-            }
+            item(key = "overview") { CategoryBreakdownCard(rides, strengthEntries) }
             items(items, key = { keyOf(it) }) { item ->
                 when (item) {
                     is ActivityListItem.Ride -> RideActivityCard(
@@ -171,37 +167,64 @@ private fun activityLabel(type: ActivityType): String = when (type) {
     ActivityType.OTHER -> "Activity"
 }
 
+private fun categoryIcon(category: ActivityCategory): ImageVector = when (category) {
+    ActivityCategory.FOOT -> Icons.AutoMirrored.Filled.DirectionsWalk
+    ActivityCategory.STRENGTH -> Icons.Filled.FitnessCenter
+    ActivityCategory.WHEEL -> Icons.Filled.DirectionsBike
+    ActivityCategory.WATER -> Icons.Filled.Waves
+}
+
+private fun categoryLabel(category: ActivityCategory): String = when (category) {
+    ActivityCategory.FOOT -> "Foot"
+    ActivityCategory.STRENGTH -> "Strength"
+    ActivityCategory.WHEEL -> "Wheel"
+    ActivityCategory.WATER -> "Water"
+}
+
+/** All-time totals broken out by [ActivityCategory] (foot/strength/wheel/water) rather than one
+ * flat All-time row - the flat version couldn't answer "how much of this is actually cycling vs.
+ * everything else," which is the whole point once activities stopped being cycling-only. Activity
+ * types that map to no category (see [ActivityType.category]) are excluded from every row here,
+ * not folded into an arbitrary bucket - they still show up in the plain feed below. */
 @Composable
-private fun OverviewCard(rides: List<RideRecord>) {
-    val totalDistanceMeters = rides.sumOf { it.distanceMeters }
-    val totalDurationSeconds = rides.sumOf { it.durationSeconds }
-    val totalKilocalories = rides.mapNotNull { it.estimatedKilocalories }.sum()
-        .takeIf { rides.any { r -> r.estimatedKilocalories != null } }
+private fun CategoryBreakdownCard(rides: List<RideRecord>, strengthEntries: List<StrengthWorkoutEntry>) {
+    val stats = remember(rides, strengthEntries) { computeCategoryBreakdown(rides, strengthEntries) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("All-time", style = MaterialTheme.typography.titleMedium)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                OverviewStat("Rides", rides.size.toString())
-                OverviewStat("Distance", Units.formatMiles(totalDistanceMeters))
-                OverviewStat("Time", Units.formatDuration(totalDurationSeconds))
-                OverviewStat("Calories", Units.formatKilocalories(totalKilocalories))
-            }
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("By Category", style = MaterialTheme.typography.titleMedium)
+            stats.forEach { CategoryStatsRow(it) }
         }
     }
 }
 
 @Composable
-private fun OverviewStat(label: String, value: String) {
-    Column {
-        Text(value, style = MaterialTheme.typography.titleMedium)
-        Text(label, style = MaterialTheme.typography.labelSmall)
+private fun CategoryStatsRow(stats: CategoryStats) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Icon(
+                categoryIcon(stats.category),
+                contentDescription = categoryLabel(stats.category),
+                modifier = Modifier.size(20.dp).padding(end = 8.dp),
+            )
+            Text("${categoryLabel(stats.category)} (${stats.count})", style = MaterialTheme.typography.bodyMedium)
+        }
+        // Distance/time/calories don't exist for a shared-in strength workout (no such data is
+        // tracked), so that row is just the count above - nothing else to show here for it.
+        if (stats.category != ActivityCategory.STRENGTH) {
+            Text(
+                "${Units.formatMiles(stats.distanceMeters)} · ${Units.formatDuration(stats.durationSeconds)} · " +
+                    Units.formatKilocalories(stats.kilocalories),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 

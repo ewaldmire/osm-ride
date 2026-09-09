@@ -175,9 +175,9 @@ class RideSummaryView(ToolbarPage):
             notes = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
             self._repo.update_ride(self._record.id, title, notes)
         self._record = None
-        # Not to Profile's Activities tab - matches Android's onFinished flow, which lands back
-        # on route planning too now that Ride hub has no History tab of its own to return to.
-        self.window.show_routes()
+        # Lands on Profile's Activities tab, not back on Ride hub - a just-saved ride is exactly
+        # the kind of thing Activities exists to show (matches Android's onFinished flow).
+        self.window.show_profile()
 
     def _open_gpx_location(self) -> None:
         if self._record is None:

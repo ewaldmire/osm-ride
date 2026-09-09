@@ -25,7 +25,8 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from ..ride import fit_parser, gpx_writer  # noqa: E402
-from ..ride.activity_type import CYCLING  # noqa: E402
+from ..ride.activity_type import CYCLING, FOOT, WATER, WHEEL  # noqa: E402
+from ..ride.activity_type import category as activity_category  # noqa: E402
 from ..ride.models import RecordedTrackPoint, RideRecord  # noqa: E402
 from ..util import units  # noqa: E402
 from . import route_thumbnail_generator  # noqa: E402
@@ -48,6 +49,12 @@ _ACTIVITY_LABELS = {
     "other": "Activity",
 }
 
+# Foot/Wheel/Water, in that order - no Strength bucket here, unlike Android's ActivitiesScreen.kt:
+# strength data only ever arrives via fosslift sharing, which is Android-only, so a permanently-
+# zero row would just be noise on this platform.
+_CATEGORY_LABELS = {FOOT: "Foot", WHEEL: "Wheel", WATER: "Water"}
+_CATEGORY_ORDER = [FOOT, WHEEL, WATER]
+
 
 def _activity_label(activity_type: str) -> str:
     return _ACTIVITY_LABELS.get(activity_type, "Activity")
@@ -66,9 +73,8 @@ class ActivitiesView(Gtk.Box):
         outer.set_margin_end(16)
         outer.set_valign(Gtk.Align.START)
 
-        self._overview_group = Adw.PreferencesGroup(title="All-time")
-        self._overview_row = Adw.ActionRow()
-        self._overview_group.add(self._overview_row)
+        self._overview_group = Adw.PreferencesGroup(title="By Category")
+        self._overview_rows: list[Adw.ActionRow] = []
 
         self._activities_group = Adw.PreferencesGroup(title="Recent Activities")
         self._activity_rows: list[Adw.ActionRow] = []
@@ -98,30 +104,34 @@ class ActivitiesView(Gtk.Box):
             self._activities_group.add(row)
 
     def _update_overview(self, rides: list[RideRecord]) -> None:
-        total_distance = sum(r.distance_meters for r in rides)
-        total_duration = sum(r.duration_seconds for r in rides)
-        kcal_values = [r.estimated_kilocalories for r in rides if r.estimated_kilocalories is not None]
+        # All-time totals broken out by category (foot/wheel/water) rather than one flat total -
+        # the flat version couldn't answer "how much of this is actually cycling vs. everything
+        # else," which is the whole point once activities stopped being cycling-only. Activity
+        # types that map to no category (see activity_type.category) are excluded from every row
+        # here, not folded into an arbitrary bucket - they still show up in the feed below.
+        by_category: dict[str, list[RideRecord]] = {c: [] for c in _CATEGORY_ORDER}
+        for record in rides:
+            cat = activity_category(record.activity_type)
+            if cat in by_category:
+                by_category[cat].append(record)
+
+        for row in self._overview_rows:
+            self._overview_group.remove(row)
+        self._overview_rows = [self._build_category_row(cat, by_category[cat]) for cat in _CATEGORY_ORDER]
+        for row in self._overview_rows:
+            self._overview_group.add(row)
+
+    def _build_category_row(self, category_key: str, records: list[RideRecord]) -> Adw.ActionRow:
+        distance = sum(r.distance_meters for r in records)
+        duration = sum(r.duration_seconds for r in records)
+        kcal_values = [r.estimated_kilocalories for r in records if r.estimated_kilocalories is not None]
         total_kcal = sum(kcal_values) if kcal_values else None
 
-        stats_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28, halign=Gtk.Align.CENTER)
-        stats_box.set_margin_top(4)
-        stats_box.set_margin_bottom(4)
-        for value, label in [
-            (str(len(rides)), "Activities"),
-            (units.format_miles(total_distance), "Distance"),
-            (units.format_duration(total_duration), "Time"),
-            (units.format_kilocalories(total_kcal), "Calories"),
-        ]:
-            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-            value_label = Gtk.Label(label=value)
-            value_label.add_css_class("title-2")
-            caption_label = Gtk.Label(label=label)
-            caption_label.add_css_class("caption")
-            caption_label.add_css_class("dim-label")
-            col.append(value_label)
-            col.append(caption_label)
-            stats_box.append(col)
-        self._overview_row.set_child(stats_box)
+        return Adw.ActionRow(
+            title=f"{_CATEGORY_LABELS[category_key]} ({len(records)})",
+            subtitle=f"{units.format_miles(distance)} · {units.format_duration(duration)} · "
+            f"{units.format_kilocalories(total_kcal)}",
+        )
 
     def _build_row(self, record: RideRecord) -> Adw.ActionRow:
         row = Adw.ActionRow(

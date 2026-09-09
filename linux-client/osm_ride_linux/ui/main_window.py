@@ -87,7 +87,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(toolbar_view)
 
         self.stack.connect("notify::visible-child-name", self._on_page_changed)
-        self.stack.set_visible_child_name("ride_hub")
+        # Profile's Activities tab, not Ride hub - it's "what did I just do", the thing worth
+        # seeing first, and where every finished-ride/import flow lands too (see show_profile()).
+        self.stack.set_visible_child_name("profile")
 
     def _on_page_changed(self, _stack: Adw.ViewStack, _pspec) -> None:  # noqa: ANN001
         name = self.stack.get_visible_child_name()
@@ -95,6 +97,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def show_profile(self) -> None:
         self.profile_view.refresh_body_metrics_summary()
+        self.profile_view.show_activities_tab()
         self.stack.set_visible_child_name("profile")
 
     def show_settings(self) -> None:

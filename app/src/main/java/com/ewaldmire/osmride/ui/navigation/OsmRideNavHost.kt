@@ -46,16 +46,20 @@ import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
  * in their TopAppBar. The four bottom-nav root tabs (Profile, Ride, Workouts, Settings) don't -
  * they're reached only via the bottom bar, so a "back" affordance on them was both redundant with
  * it and, worse, always landed on the same fixed screen regardless of which tab the user actually
- * came from (the bottom bar's popUpTo(RIDE_HUB) reset below means popBackStack() on a root tab
+ * came from (the bottom bar's popUpTo(PROFILE) reset below means popBackStack() on a root tab
  * always resolves to the same anchor, not whatever tab preceded it).
+ *
+ * Profile (specifically its Activities tab) is the app's start destination and where every share/
+ * import/finished-ride flow lands - it's "what did I just do", the thing worth seeing first.
  *
  * [pendingWorkoutImportUri] is the osmride://import-workout deep link fosslift launches to share a
  * completed strength workout in; [pendingFitShareUri] is a .fit file shared in via the OS
  * Sharesheet (e.g. from a bike computer's companion app) - see MainActivity, which owns
  * intent/onNewIntent handling and hands both down here as Compose state. Each is non-null exactly
  * once per share; consumed via their matching onConsumed callback so rotation/recomposition
- * doesn't reimport it. Both land on Profile's Activities tab on success (see [profileInitialTab]
- * below) - strength workouts and any .fit-imported activity are both just "activities" now. */
+ * doesn't reimport it. Both land on Profile's Activities tab on success (see [requestProfileTab]
+ * below), same as finishing a live ride does - strength workouts, any .fit-imported activity, and
+ * a just-finished ride are all just "activities" now. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OsmRideNavHost(
@@ -69,12 +73,21 @@ fun OsmRideNavHost(
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val context = LocalContext.current
 
-    // One-shot hint for ProfileScreen: which sub-tab to land on next time it's (re)shown. Only
-    // the two LaunchedEffects below ever change this away from its default - see ProfileScreen's
-    // own doc comment for why a hoisted flag, not a nav argument, is what actually works here
-    // (the ProfileScreen backstack entry is never destroyed/recreated across a share, so a nav
-    // argument's default would only apply on a truly fresh entry, not this one).
+    // One-shot hint for ProfileScreen: which sub-tab to land on next time it's (re)shown - see
+    // ProfileScreen's own doc comment for why a hoisted flag, not a nav argument, is what actually
+    // works here (the ProfileScreen backstack entry is never destroyed/recreated across a share,
+    // so a nav argument's default would only apply on a truly fresh entry, not this one).
+    // [profileTabRequestId] exists purely so ProfileScreen's LaunchedEffect(key) reliably re-fires
+    // even when the requested tab is the same value as before (e.g. two rides finished in a row
+    // both request Activities) - keying only on the tab value wouldn't change on the second
+    // request, so nothing would force the switch if the rider had manually flipped to Metrics
+    // in between.
     var profileInitialTab by remember { mutableStateOf(ProfileTab.Activities) }
+    var profileTabRequestId by remember { mutableStateOf(0) }
+    fun requestProfileTab(tab: ProfileTab) {
+        profileInitialTab = tab
+        profileTabRequestId++
+    }
 
     LaunchedEffect(pendingWorkoutImportUri) {
         val uri = pendingWorkoutImportUri ?: return@LaunchedEffect
@@ -86,9 +99,9 @@ fun OsmRideNavHost(
                 workoutName = imported.workoutName,
                 exercises = imported.exercises,
             )
-            profileInitialTab = ProfileTab.Activities
+            requestProfileTab(ProfileTab.Activities)
             navController.navigate(Destinations.PROFILE) {
-                popUpTo(Destinations.RIDE_HUB) { saveState = true }
+                popUpTo(Destinations.PROFILE) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
@@ -101,9 +114,9 @@ fun OsmRideNavHost(
         val app = context.applicationContext as OsmRideApp
         val error = FitFileImporter.importFitFile(app, uri, pendingFitShareDisplayName)
         if (error == null) {
-            profileInitialTab = ProfileTab.Activities
+            requestProfileTab(ProfileTab.Activities)
             navController.navigate(Destinations.PROFILE) {
-                popUpTo(Destinations.RIDE_HUB) { saveState = true }
+                popUpTo(Destinations.PROFILE) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
             }
@@ -123,7 +136,7 @@ fun OsmRideNavHost(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
                         navController.navigate(route) {
-                            popUpTo(Destinations.RIDE_HUB) { saveState = true }
+                            popUpTo(Destinations.PROFILE) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -134,7 +147,7 @@ fun OsmRideNavHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Destinations.RIDE_HUB,
+            startDestination = Destinations.PROFILE,
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(Destinations.RIDE_HUB) {
@@ -170,6 +183,7 @@ fun OsmRideNavHost(
             composable(Destinations.PROFILE) {
                 ProfileScreen(
                     initialTab = profileInitialTab,
+                    initialTabRequestId = profileTabRequestId,
                     onOpenBodyMetrics = { navController.navigate(Destinations.BODY_METRICS) },
                 )
             }
@@ -227,7 +241,14 @@ fun OsmRideNavHost(
             composable(Destinations.SUMMARY) {
                 RideSummaryScreen(
                     onDone = {
-                        navController.popBackStack(Destinations.RIDE_HUB, inclusive = false)
+                        // Lands on Profile's Activities tab, not back on Ride hub - a just-saved
+                        // ride is exactly the kind of thing Activities exists to show.
+                        requestProfileTab(ProfileTab.Activities)
+                        navController.navigate(Destinations.PROFILE) {
+                            popUpTo(Destinations.PROFILE) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     },
                 )
             }

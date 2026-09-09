@@ -93,6 +93,9 @@ class ProfileView(ToolbarPage):
         self._import_button.set_visible(is_activities)
         self._window_title.set_subtitle(_ACTIVITIES_SUBTITLE if is_activities else _METRICS_SUBTITLE)
 
+    def show_activities_tab(self) -> None:
+        self._stack.set_visible_child_name("activities")
+
     def refresh_body_metrics_summary(self) -> None:
         latest_weight = self._weight_repo.entries[0] if self._weight_repo.entries else None
         latest_waist = self._waist_repo.entries[0] if self._waist_repo.entries else None
