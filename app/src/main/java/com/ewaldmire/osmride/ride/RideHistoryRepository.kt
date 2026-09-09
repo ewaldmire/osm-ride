@@ -11,7 +11,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Persists completed rides (GPX + summary) to app-private storage for the history screen. */
+/** Persists completed rides (GPX + summary) to app-private storage, shown in Profile's Activities
+ * feed alongside StrengthWorkoutEntry (see ActivitiesViewModel, which merges the two). Every
+ * record is still cycling-shaped in storage (distance/speed/power/cadence), but
+ * [RideRecord.activityType] tracks what it actually was for .fit imports that turn out not to be
+ * cycling. */
 class RideHistoryRepository(context: Context) {
     private val appContext = context.applicationContext
     private val ridesDir: File = File(appContext.filesDir, "rides").apply { mkdirs() }
@@ -52,7 +56,7 @@ class RideHistoryRepository(context: Context) {
     /** Saves an outdoor ride imported from a .fit file - same storage shape as a live-recorded
      * ride, just with no [RideRecord.routeId] (there's no in-app route it was ridden against) and
      * a caller-supplied completion time (the ride's own recorded time, not "now"). See
-     * FitFileParser/RideHistoryViewModel.importFitFile. */
+     * FitFileParser/ActivitiesViewModel.importFitFile. */
     suspend fun importRide(
         title: String,
         completedAtEpochMillis: Long,
@@ -64,6 +68,7 @@ class RideHistoryRepository(context: Context) {
         avgHeartRateBpm: Double?,
         estimatedKilocalories: Double?,
         gpxContent: String,
+        activityType: ActivityType,
     ): RideRecord = withContext(Dispatchers.IO) {
         val id = UUID.randomUUID().toString()
         val fileName = "$id.gpx"
@@ -83,6 +88,7 @@ class RideHistoryRepository(context: Context) {
             avgHeartRateBpm = avgHeartRateBpm,
             estimatedKilocalories = estimatedKilocalories,
             gpxFileName = fileName,
+            activityType = activityType,
         )
         val updated = (listOf(record) + _rides.value).sortedByDescending { it.completedAtEpochMillis }
         _rides.value = updated

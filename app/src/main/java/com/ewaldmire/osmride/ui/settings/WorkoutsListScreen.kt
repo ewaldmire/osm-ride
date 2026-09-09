@@ -1,5 +1,9 @@
 package com.ewaldmire.osmride.ui.settings
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,58 +19,107 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ride.Workout
 import com.ewaldmire.osmride.ui.workout.WorkoutProfileChart
 import com.ewaldmire.osmride.util.Units
 import kotlin.math.roundToInt
 
-/**
- * Body content only, no Scaffold/TopAppBar of its own - embedded inside WorkoutsHubScreen
- * alongside StrengthWorkoutsContent under one shared top bar (with a Cycling/Weights tab row).
- * Create/Import actions and the import launcher/snackbar live on the hub, same split as
- * RideHubScreen/RoutesListContent. See WorkoutsHubScreen.kt.
- */
+/** Structured (ERG-mode) trainer workouts you can select to ride against - a library of plans,
+ * not a history of what you've done (see ActivitiesScreen.kt under Profile for that; strength
+ * workouts shared in from fosslift used to live here behind a Weights tab, but moved there too
+ * once outdoor .fit imports could be non-cycling activities as well). */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutsListContent(
-    padding: PaddingValues,
-    viewModel: WorkoutsListViewModel,
+fun WorkoutsListScreen(
+    onCreateWorkout: () -> Unit,
     onEditWorkout: (String) -> Unit,
+    viewModel: WorkoutsListViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
     val workouts by viewModel.workouts.collectAsState()
+    val importError by viewModel.importError.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    if (workouts.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(Icons.Filled.FitnessCenter, contentDescription = null)
-            Text(
-                "No workouts yet. Use the buttons above to create or import one.",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 12.dp),
-            )
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.importWorkout(uri, queryDisplayName(uri, context))
         }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(workouts, key = { it.id }) { workout ->
-                WorkoutCard(
-                    workout = workout,
-                    onEdit = { onEditWorkout(workout.id) },
-                    onDelete = { viewModel.deleteWorkout(workout.id) },
+    }
+
+    LaunchedEffect(importError) {
+        importError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearImportError()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Workout Library")
+                        Text(
+                            "Import .erg, .mrc, or .zwo files for ERG mode",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
+                actions = {
+                    // Matches RoutesListScreen's top-bar Create/Import actions - text, not
+                    // icon-only, and no longer a bottom FAB that could cover the last card.
+                    TextButton(onClick = onCreateWorkout) { Text("Create") }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
+                },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
+    ) { padding ->
+        if (workouts.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(Icons.Filled.FitnessCenter, contentDescription = null)
+                Text(
+                    "No workouts yet. Use the buttons above to create or import one.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 12.dp),
                 )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(workouts, key = { it.id }) { workout ->
+                    WorkoutCard(
+                        workout = workout,
+                        onEdit = { onEditWorkout(workout.id) },
+                        onDelete = { viewModel.deleteWorkout(workout.id) },
+                    )
+                }
             }
         }
     }
@@ -124,4 +177,14 @@ private fun Workout.averageWatts(): Int? {
         totalSeconds += duration
     }
     return if (totalSeconds > 0) (weightedSum / totalSeconds).roundToInt() else null
+}
+
+private fun queryDisplayName(uri: Uri, context: android.content.Context): String? {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (index >= 0 && cursor.moveToFirst()) {
+            return cursor.getString(index)
+        }
+    }
+    return null
 }

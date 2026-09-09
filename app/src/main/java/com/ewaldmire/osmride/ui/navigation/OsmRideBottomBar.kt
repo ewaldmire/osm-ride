@@ -15,10 +15,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 private data class BottomBarTab(val route: String, val label: String, val icon: ImageVector)
 
-// "Ride" (not "Routes"/"History") - this tab combines starting a ride and reviewing past ones
-// (see RideHubScreen.kt), reframed as one action-oriented area rather than two separate screens.
-// "Profile" holds personal "about you" data (FTP, weight) - not app configuration, so it's
-// distinct from Settings.
+// "Ride" (not "Routes") is just route planning now - completed-activity history moved to
+// "Profile" (see RideHubScreen.kt/ProfileScreen.kt), which holds personal "about you" data
+// (Activities feed, FTP, weight) - not app configuration, so it's distinct from Settings.
 private val bottomBarTabs = listOf(
     BottomBarTab(Destinations.PROFILE, "Profile", Icons.Filled.Person),
     BottomBarTab(Destinations.RIDE_HUB, "Ride", Icons.Filled.DirectionsBike),

@@ -49,9 +49,8 @@ import java.io.File
 import kotlinx.coroutines.launch
 
 /**
- * Body content only, no Scaffold/TopAppBar of its own - embedded inside RideHubScreen alongside
- * RideHistoryContent under one shared top bar (with a Routes/History tab row and, only while
- * this tab is active, the Create/Import actions). See RideHubScreen.kt.
+ * Body content only, no Scaffold/TopAppBar of its own - embedded inside RideHubScreen, which owns
+ * the Create/Import actions and Scaffold/TopAppBar. See RideHubScreen.kt.
  */
 @Composable
 fun RoutesListContent(

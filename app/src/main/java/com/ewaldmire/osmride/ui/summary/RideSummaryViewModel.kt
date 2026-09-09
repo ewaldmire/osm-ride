@@ -48,7 +48,7 @@ class RideSummaryViewModel(application: Application) : AndroidViewModel(applicat
 
     // A snapshot of this ride's own recorded track, not the route's planning thumbnail - those
     // can differ if the rider stopped early or deviated. Recomputed on every call (like
-    // RideHistoryViewModel's) rather than cached, since it changes once generateThumbnail finishes.
+    // ActivitiesViewModel's) rather than cached, since it changes once generateThumbnail finishes.
     fun thumbnailFile(record: RideRecord): File? = historyRepository.thumbnailFile(record)
 
     private fun generateThumbnail(record: RideRecord, trackPoints: List<RecordedTrackPoint>) {

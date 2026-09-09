@@ -9,18 +9,21 @@ import kotlinx.coroutines.withContext
 import org.maplibre.android.geometry.LatLng
 
 /**
- * Imports a completed outdoor ride recorded by a bike computer/GPS watch/app (e.g. Garmin, Wahoo,
- * Strava export) from a .fit file - added to history the same way a live indoor ride is, just
- * with no associated in-app route (see RideHistoryRepository.importRide).
+ * Imports a completed outdoor activity recorded by a bike computer/GPS watch/app (e.g. Garmin,
+ * Wahoo, Strava export) from a .fit file - added to Profile's Activities feed the same way a live
+ * indoor ride is, just with no associated in-app route (see RideHistoryRepository.importRide) and
+ * whatever [com.ewaldmire.osmride.ride.ActivityType] the file's own `sport` field says it was
+ * (not necessarily cycling).
  *
  * Shared by two entry points that need the exact same parse-GPX-save-thumbnail pipeline but
- * surface errors differently: [RideHistoryViewModel][com.ewaldmire.osmride.ui.history.RideHistoryViewModel]'s
- * in-app "Import" button (sets its own importError StateFlow, shown as a Snackbar already on
- * screen) and OsmRideNavHost's OS-Sharesheet/ACTION_SEND handling (MainActivity - launched fresh
- * from outside the app, so there's no ViewModel/Snackbar already in scope to report into; that
- * caller shows a Toast instead). Deliberately a plain suspend function, not tied to a ViewModel,
- * so it works from both contexts without fighting Compose Navigation's per-destination
- * ViewModelStore scoping.
+ * surface errors differently:
+ * [ActivitiesViewModel][com.ewaldmire.osmride.ui.activities.ActivitiesViewModel]'s in-app
+ * "Import" button (sets its own importError StateFlow, shown as a Snackbar already on screen) and
+ * OsmRideNavHost's OS-Sharesheet/ACTION_SEND handling (MainActivity - launched fresh from outside
+ * the app, so there's no ViewModel/Snackbar already in scope to report into; that caller shows a
+ * Toast instead). Deliberately a plain suspend function, not tied to a ViewModel, so it works
+ * from both contexts without fighting Compose Navigation's per-destination ViewModelStore
+ * scoping.
  */
 object FitFileImporter {
     /** Returns an error message on failure, or null on success. */
@@ -59,6 +62,7 @@ object FitFileImporter {
             avgHeartRateBpm = summary.avgHeartRateBpm,
             estimatedKilocalories = summary.totalCalories,
             gpxContent = gpxContent,
+            activityType = summary.activityType,
         )
         generateThumbnail(app, record, trackPoints)
         return null

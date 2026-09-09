@@ -26,15 +26,14 @@ import com.ewaldmire.osmride.strength.StrengthWorkoutImport
 import com.ewaldmire.osmride.ui.bodymetrics.BodyMetricsScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
 import com.ewaldmire.osmride.ui.profile.ProfileScreen
+import com.ewaldmire.osmride.ui.profile.ProfileTab
 import com.ewaldmire.osmride.ui.ride.RideScreen
 import com.ewaldmire.osmride.ui.ridehub.RideHubScreen
-import com.ewaldmire.osmride.ui.ridehub.RideHubTab
 import com.ewaldmire.osmride.ui.routecreator.RouteCreatorScreen
 import com.ewaldmire.osmride.ui.settings.SettingsScreen
+import com.ewaldmire.osmride.ui.settings.WorkoutsListScreen
 import com.ewaldmire.osmride.ui.summary.RideSummaryScreen
 import com.ewaldmire.osmride.ui.workoutcreator.WorkoutCreatorScreen
-import com.ewaldmire.osmride.ui.workoutshub.WorkoutsHubScreen
-import com.ewaldmire.osmride.ui.workoutshub.WorkoutsHubTab
 
 /** The persistent bottom bar (see [OsmRideBottomBar]) lives on this single outer Scaffold, not
  * on each screen - every screen still keeps its own Scaffold+TopAppBar for its title, nested
@@ -55,7 +54,8 @@ import com.ewaldmire.osmride.ui.workoutshub.WorkoutsHubTab
  * Sharesheet (e.g. from a bike computer's companion app) - see MainActivity, which owns
  * intent/onNewIntent handling and hands both down here as Compose state. Each is non-null exactly
  * once per share; consumed via their matching onConsumed callback so rotation/recomposition
- * doesn't reimport it. */
+ * doesn't reimport it. Both land on Profile's Activities tab on success (see [profileInitialTab]
+ * below) - strength workouts and any .fit-imported activity are both just "activities" now. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OsmRideNavHost(
@@ -69,16 +69,12 @@ fun OsmRideNavHost(
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val context = LocalContext.current
 
-    // One-shot hint for RideHubScreen: which sub-tab to land on next time it's (re)shown. Only
-    // the ride-finish flow below ever changes this away from its default - see RideHubScreen's
+    // One-shot hint for ProfileScreen: which sub-tab to land on next time it's (re)shown. Only
+    // the two LaunchedEffects below ever change this away from its default - see ProfileScreen's
     // own doc comment for why a hoisted flag, not a nav argument, is what actually works here
-    // (the RideHubScreen backstack entry is never destroyed/recreated across a ride, so a nav
+    // (the ProfileScreen backstack entry is never destroyed/recreated across a share, so a nav
     // argument's default would only apply on a truly fresh entry, not this one).
-    var rideHubInitialTab by remember { mutableStateOf(RideHubTab.Routes) }
-
-    // Same one-shot-hint pattern, for WorkoutsHubScreen - set to Weights right after a fosslift
-    // import lands, below.
-    var workoutsHubInitialTab by remember { mutableStateOf(WorkoutsHubTab.Cycling) }
+    var profileInitialTab by remember { mutableStateOf(ProfileTab.Activities) }
 
     LaunchedEffect(pendingWorkoutImportUri) {
         val uri = pendingWorkoutImportUri ?: return@LaunchedEffect
@@ -90,8 +86,8 @@ fun OsmRideNavHost(
                 workoutName = imported.workoutName,
                 exercises = imported.exercises,
             )
-            workoutsHubInitialTab = WorkoutsHubTab.Weights
-            navController.navigate(Destinations.WORKOUTS_LIST) {
+            profileInitialTab = ProfileTab.Activities
+            navController.navigate(Destinations.PROFILE) {
                 popUpTo(Destinations.RIDE_HUB) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
@@ -105,8 +101,8 @@ fun OsmRideNavHost(
         val app = context.applicationContext as OsmRideApp
         val error = FitFileImporter.importFitFile(app, uri, pendingFitShareDisplayName)
         if (error == null) {
-            rideHubInitialTab = RideHubTab.History
-            navController.navigate(Destinations.RIDE_HUB) {
+            profileInitialTab = ProfileTab.Activities
+            navController.navigate(Destinations.PROFILE) {
                 popUpTo(Destinations.RIDE_HUB) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
@@ -114,7 +110,7 @@ fun OsmRideNavHost(
         } else {
             // Launched fresh from the OS Sharesheet - no screen/Snackbar already on-screen to
             // report into (unlike the in-app "Import" button's importError, see
-            // RideHistoryViewModel), so a Toast is the only reasonable way to surface this.
+            // ActivitiesViewModel), so a Toast is the only reasonable way to surface this.
             Toast.makeText(context, error, Toast.LENGTH_LONG).show()
         }
         onPendingFitShareConsumed()
@@ -143,7 +139,6 @@ fun OsmRideNavHost(
         ) {
             composable(Destinations.RIDE_HUB) {
                 RideHubScreen(
-                    initialTab = rideHubInitialTab,
                     onRouteSelected = { routeId -> navController.navigate(Destinations.ride(routeId)) },
                     onCreateRoute = { navController.navigate(Destinations.ROUTE_CREATOR_NEW) },
                     onEditRoute = { routeId, showDerivedHint ->
@@ -174,6 +169,7 @@ fun OsmRideNavHost(
             }
             composable(Destinations.PROFILE) {
                 ProfileScreen(
+                    initialTab = profileInitialTab,
                     onOpenBodyMetrics = { navController.navigate(Destinations.BODY_METRICS) },
                 )
             }
@@ -186,8 +182,7 @@ fun OsmRideNavHost(
                 BodyMetricsScreen(onBack = { navController.popBackStack() })
             }
             composable(Destinations.WORKOUTS_LIST) {
-                WorkoutsHubScreen(
-                    initialTab = workoutsHubInitialTab,
+                WorkoutsListScreen(
                     onCreateWorkout = { navController.navigate(Destinations.WORKOUT_CREATOR_NEW) },
                     onEditWorkout = { workoutId -> navController.navigate(Destinations.workoutCreatorEdit(workoutId)) },
                 )
@@ -220,7 +215,6 @@ fun OsmRideNavHost(
                     RideScreen(
                         routeId = routeId,
                         onFinished = {
-                            rideHubInitialTab = RideHubTab.History
                             navController.navigate(Destinations.SUMMARY) {
                                 popUpTo(Destinations.RIDE_HUB)
                             }

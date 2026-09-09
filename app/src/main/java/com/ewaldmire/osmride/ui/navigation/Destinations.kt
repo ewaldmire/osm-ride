@@ -4,8 +4,8 @@ object Destinations {
     const val PAIRING = "pairing"
     const val RIDE = "ride/{routeId}"
     const val SUMMARY = "summary"
-    /** Home screen: Routes + History combined behind a tab switcher (see RideHubScreen.kt) -
-     * distinct from [RIDE], the live-riding map screen. */
+    /** Home screen: route planning (see RideHubScreen.kt) - distinct from [RIDE], the
+     * live-riding map screen. Completed-activity history lives under [PROFILE] instead. */
     const val RIDE_HUB = "ride_hub"
     const val PROFILE = "profile"
     const val SETTINGS = "settings"

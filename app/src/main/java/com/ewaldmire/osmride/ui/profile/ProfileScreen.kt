@@ -1,7 +1,12 @@
 package com.ewaldmire.osmride.ui.profile
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,13 +20,21 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,24 +42,107 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ewaldmire.osmride.ui.activities.ActivitiesContent
+import com.ewaldmire.osmride.ui.activities.ActivitiesViewModel
 import com.ewaldmire.osmride.ui.settings.SettingsPrefs
 import com.ewaldmire.osmride.util.Units
 import com.ewaldmire.osmride.weight.WaistEntry
 import com.ewaldmire.osmride.weight.WeightEntry
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-private val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+enum class ProfileTab { Activities, Metrics }
 
-/** Personal "about you" data used elsewhere in the app - FTP (for %FTP-based workouts) and
- * weight/waist (their own tracking screen, see BodyMetricsScreen) - as opposed to Settings, which
- * is just app configuration (Bluetooth pairing). */
+/**
+ * Personal "about you" data: completed activities (any .fit-imported outdoor activity, plus
+ * strength workouts shared in from fosslift - see ActivitiesScreen.kt) and body
+ * measurements/training info (weight/waist/body-fat via Body Metrics, FTP) - as opposed to
+ * Settings, which is just app configuration (Bluetooth pairing). Tabbed the same way as the Ride
+ * hub/Workouts screen used to be, since Activities used to live under Ride hub before .fit
+ * imports could be non-cycling activities.
+ *
+ * [initialTab] is a one-shot hint, not a persistent nav argument - mirrors RideHubScreen's own
+ * former doc comment on the same pattern. It's how an incoming .fit-Sharesheet import or a
+ * fosslift strength-workout share (OsmRideNavHost) lands here on the Activities sub-tab
+ * specifically.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    initialTab: ProfileTab,
     onOpenBodyMetrics: () -> Unit,
-    viewModel: ProfileViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel(),
+    activitiesViewModel: ActivitiesViewModel = viewModel(),
+) {
+    val context = LocalContext.current
+    var selectedTab by rememberSaveable { mutableStateOf(initialTab) }
+    LaunchedEffect(initialTab) { selectedTab = initialTab }
+
+    val importError by activitiesViewModel.importError.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val importFitLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            activitiesViewModel.importFitFile(uri, queryDisplayName(uri, context))
+        }
+    }
+
+    LaunchedEffect(importError) {
+        importError?.let {
+            snackbarHostState.showSnackbar(it)
+            activitiesViewModel.clearImportError()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Profile")
+                            Text(
+                                if (selectedTab == ProfileTab.Activities) {
+                                    "Completed rides, outdoor activities, and workouts"
+                                } else {
+                                    "Personal info used to tailor your training"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    },
+                    actions = {
+                        if (selectedTab == ProfileTab.Activities) {
+                            TextButton(onClick = { importFitLauncher.launch(arrayOf("*/*")) }) { Text("Import") }
+                        }
+                    },
+                )
+                TabRow(selectedTabIndex = selectedTab.ordinal) {
+                    Tab(
+                        selected = selectedTab == ProfileTab.Activities,
+                        onClick = { selectedTab = ProfileTab.Activities },
+                        text = { Text("Activities") },
+                    )
+                    Tab(
+                        selected = selectedTab == ProfileTab.Metrics,
+                        onClick = { selectedTab = ProfileTab.Metrics },
+                        text = { Text("Metrics") },
+                    )
+                }
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
+    ) { padding ->
+        when (selectedTab) {
+            ProfileTab.Activities -> ActivitiesContent(padding = padding, viewModel = activitiesViewModel)
+            ProfileTab.Metrics -> MetricsTab(padding = padding, viewModel = profileViewModel, onOpenBodyMetrics = onOpenBodyMetrics)
+        }
+    }
+}
+
+@Composable
+private fun MetricsTab(
+    padding: PaddingValues,
+    viewModel: ProfileViewModel,
+    onOpenBodyMetrics: () -> Unit,
 ) {
     val context = LocalContext.current
     var ftpText by remember { mutableStateOf(SettingsPrefs.getFtpWatts(context)?.toString() ?: "") }
@@ -55,64 +151,45 @@ fun ProfileScreen(
     val latestWeight = weightEntries.firstOrNull()
     val latestWaist = waistEntries.firstOrNull()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
+    Column(
+        modifier = Modifier.padding(padding).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Card(onClick = onOpenBodyMetrics, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.MonitorWeight, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
                     Column {
-                        Text("Profile")
+                        Text("Body Metrics", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Personal info used to tailor your training",
+                            bodyMetricsSummary(latestWeight, latestWaist),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier.padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Card(onClick = onOpenBodyMetrics, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Filled.MonitorWeight, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
-                        Column {
-                            Text("Body Metrics", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                bodyMetricsSummary(latestWeight, latestWaist),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    Icon(Icons.Filled.ChevronRight, contentDescription = null)
                 }
+                Icon(Icons.Filled.ChevronRight, contentDescription = null)
             }
-
-            Text("Training", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                value = ftpText,
-                onValueChange = { text ->
-                    ftpText = text.filter { it.isDigit() }
-                    SettingsPrefs.setFtpWatts(context, ftpText.toIntOrNull())
-                },
-                label = { Text("FTP (watts)") },
-                supportingText = { Text("Needed to convert %FTP-based .mrc/.zwo workouts to watts") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
+
+        Text("Training", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = ftpText,
+            onValueChange = { text ->
+                ftpText = text.filter { it.isDigit() }
+                SettingsPrefs.setFtpWatts(context, ftpText.toIntOrNull())
+            },
+            label = { Text("FTP (watts)") },
+            supportingText = { Text("Needed to convert %FTP-based .mrc/.zwo workouts to watts") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
-
-private fun formatDate(epochMillis: Long): String =
-    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(dateFormatter)
 
 private fun bodyMetricsSummary(latestWeight: WeightEntry?, latestWaist: WaistEntry?): String {
     if (latestWeight == null && latestWaist == null) return "No measurements logged yet"
@@ -120,4 +197,14 @@ private fun bodyMetricsSummary(latestWeight: WeightEntry?, latestWaist: WaistEnt
     latestWeight?.let { parts.add("Weight ${Units.formatWeightLbs(it.weightKg)}") }
     latestWaist?.let { parts.add("Waist ${Units.formatWaistCm(it.waistCm)}") }
     return parts.joinToString(" · ")
+}
+
+private fun queryDisplayName(uri: Uri, context: android.content.Context): String? {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (index >= 0 && cursor.moveToFirst()) {
+            return cursor.getString(index)
+        }
+    }
+    return null
 }

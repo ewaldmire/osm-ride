@@ -9,8 +9,9 @@ package com.ewaldmire.osmride.ride
  * layout) is well-documented and widely reimplemented from scratch (e.g. Python's `fitparse`,
  * which this follows the same shape as).
  *
- * Only the two message types and fields an outdoor cycling history entry actually needs are
- * decoded - `record` (per-second GPS/sensor samples) and `session` (ride-level summary). Every
+ * Only the two message types and fields an Activities entry actually needs are decoded - `record`
+ * (per-second GPS/sensor samples) and `session` (activity-level summary, including the `sport`
+ * field used to classify what kind of activity this was - see ActivityType.fromFitSport). Every
  * other global message type is walked past using its own definition's field sizes, not
  * interpreted - this keeps the parser small without needing to special-case whatever
  * device/app-specific messages a given file happens to contain.
@@ -167,6 +168,7 @@ object FitFileParser {
         // to fall back on), so prefer it outright rather than recomputing.
         val totalCalories = session?.values?.get(11)?.takeIf { it != 0xFFFFL }?.toDouble()
             ?: avgPowerWatts?.let { it * durationSeconds / 1000.0 }
+        val activityType = ActivityType.fromFitSport(session?.values?.get(5))
 
         return FitRideSummary(
             startEpochMillis = startEpochMillis,
@@ -178,6 +180,7 @@ object FitFileParser {
             avgCadenceRpm = avgCadenceRpm,
             avgHeartRateBpm = avgHeartRateBpm,
             totalCalories = totalCalories,
+            activityType = activityType,
             points = points,
         )
     }
@@ -256,5 +259,6 @@ data class FitRideSummary(
     val avgCadenceRpm: Double?,
     val avgHeartRateBpm: Double?,
     val totalCalories: Double?,
+    val activityType: ActivityType,
     val points: List<FitRidePoint>,
 )

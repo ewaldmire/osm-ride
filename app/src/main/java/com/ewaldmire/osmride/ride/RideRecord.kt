@@ -33,4 +33,7 @@ data class RideRecord(
      * to compute it from (e.g. a CSC-only trainer with no power meter). */
     val estimatedKilocalories: Double? = null,
     val gpxFileName: String,
+    /** Defaults to CYCLING for backward compatibility - every ride saved before this field
+     * existed was a live-recorded indoor ride, which is always cycling. */
+    val activityType: ActivityType = ActivityType.CYCLING,
 )
