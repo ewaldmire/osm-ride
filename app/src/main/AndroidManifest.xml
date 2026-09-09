@@ -58,6 +58,25 @@
                     android:scheme="osmride"
                     android:host="import-workout" />
             </intent-filter>
+
+            <!--
+              Lets OSM Ride show up in the OS Sharesheet when another app (a bike computer's
+              companion app - e.g. Wahoo ELEMNT, Garmin Connect - or a file manager) shares a .fit
+              file - see MainActivity's ACTION_SEND handling/FitFileImporter.kt. There's no
+              IANA-registered MIME type for .fit, so apps vary in what they declare; the file
+              itself arrives via EXTRA_STREAM (not intent.data), so ACTION_SEND can only be
+              filtered by mimeType here, not by filename/extension. application/octet-stream is
+              registered because Android's MimeTypeMap has no built-in mapping for the "fit"
+              extension, so most apps that resolve type via ContentResolver/FileProvider (the
+              standard sharing path) fall back to it; application/vnd.ant.fit is registered too in
+              case a given app hardcodes a more specific type instead.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/vnd.ant.fit" />
+            </intent-filter>
         </activity>
 
         <!--

@@ -1,6 +1,7 @@
 package com.ewaldmire.osmride.ui.navigation
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -20,6 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ewaldmire.osmride.OsmRideApp
+import com.ewaldmire.osmride.ride.FitFileImporter
 import com.ewaldmire.osmride.strength.StrengthWorkoutImport
 import com.ewaldmire.osmride.ui.bodymetrics.BodyMetricsScreen
 import com.ewaldmire.osmride.ui.pairing.DevicePairingScreen
@@ -49,15 +51,20 @@ import com.ewaldmire.osmride.ui.workoutshub.WorkoutsHubTab
  * always resolves to the same anchor, not whatever tab preceded it).
  *
  * [pendingWorkoutImportUri] is the osmride://import-workout deep link fosslift launches to share a
- * completed strength workout in (see MainActivity, which owns intent/onNewIntent handling and
- * hands the Uri down here as Compose state). Non-null exactly once per share; consumed via
- * [onPendingWorkoutImportConsumed] so rotation/recomposition doesn't reimport it. */
+ * completed strength workout in; [pendingFitShareUri] is a .fit file shared in via the OS
+ * Sharesheet (e.g. from a bike computer's companion app) - see MainActivity, which owns
+ * intent/onNewIntent handling and hands both down here as Compose state. Each is non-null exactly
+ * once per share; consumed via their matching onConsumed callback so rotation/recomposition
+ * doesn't reimport it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OsmRideNavHost(
     navController: NavHostController = rememberNavController(),
     pendingWorkoutImportUri: Uri? = null,
     onPendingWorkoutImportConsumed: () -> Unit = {},
+    pendingFitShareUri: Uri? = null,
+    pendingFitShareDisplayName: String? = null,
+    onPendingFitShareConsumed: () -> Unit = {},
 ) {
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val context = LocalContext.current
@@ -91,6 +98,26 @@ fun OsmRideNavHost(
             }
         }
         onPendingWorkoutImportConsumed()
+    }
+
+    LaunchedEffect(pendingFitShareUri) {
+        val uri = pendingFitShareUri ?: return@LaunchedEffect
+        val app = context.applicationContext as OsmRideApp
+        val error = FitFileImporter.importFitFile(app, uri, pendingFitShareDisplayName)
+        if (error == null) {
+            rideHubInitialTab = RideHubTab.History
+            navController.navigate(Destinations.RIDE_HUB) {
+                popUpTo(Destinations.RIDE_HUB) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        } else {
+            // Launched fresh from the OS Sharesheet - no screen/Snackbar already on-screen to
+            // report into (unlike the in-app "Import" button's importError, see
+            // RideHistoryViewModel), so a Toast is the only reasonable way to surface this.
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+        }
+        onPendingFitShareConsumed()
     }
 
     Scaffold(
