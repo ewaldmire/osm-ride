@@ -118,6 +118,6 @@ private fun bodyMetricsSummary(latestWeight: WeightEntry?, latestWaist: WaistEnt
     if (latestWeight == null && latestWaist == null) return "No measurements logged yet"
     val parts = mutableListOf<String>()
     latestWeight?.let { parts.add("Weight ${Units.formatWeightLbs(it.weightKg)}") }
-    latestWaist?.let { parts.add("Waist ${Units.formatWaistInches(it.waistCm)}") }
+    latestWaist?.let { parts.add("Waist ${Units.formatWaistCm(it.waistCm)}") }
     return parts.joinToString(" · ")
 }

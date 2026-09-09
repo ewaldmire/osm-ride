@@ -68,4 +68,4 @@ def weight_trend_points(entries: list[WeightEntry]) -> list[TrendPoint]:
 
 
 def waist_trend_points(entries: list[WaistEntry]) -> list[TrendPoint]:
-    return [TrendPoint(e.recorded_at_epoch_millis, units.cm_to_inches(e.waist_cm)) for e in entries]
+    return [TrendPoint(e.recorded_at_epoch_millis, e.waist_cm) for e in entries]

@@ -205,7 +205,7 @@ class BodyMetricsView(ToolbarPage):
         self.add_top_bar(header)
 
         self._weekly_weight_stat = _WeeklyStat("Weight", "lb")
-        self._weekly_waist_stat = _WeeklyStat("Waist", "in")
+        self._weekly_waist_stat = _WeeklyStat("Waist", "cm")
         # A shrinking waist at a flat weight is still real recomposition progress, not a plateau -
         # worth calling out explicitly since the scale alone would read as nothing happening.
         self._weekly_note = Gtk.Label(xalign=0.0, wrap=True, visible=False)
@@ -241,10 +241,10 @@ class BodyMetricsView(ToolbarPage):
         )
         self._waist_page = _MeasurementPage(
             repo=self._waist_repo,
-            unit_label="Waist (in)",
+            unit_label="Waist (cm)",
             value_of=lambda e: e.waist_cm,
-            format_value=units.format_waist_inches,
-            to_internal=units.inches_to_cm,
+            format_value=units.format_waist_cm,
+            to_internal=lambda cm: cm,
             empty_message="No waist measurements logged yet",
             extra_widget=self._build_body_fat_card(),
         )
@@ -283,8 +283,9 @@ class BodyMetricsView(ToolbarPage):
         self._weekly_weight_stat.set_delta(weight_delta)
         self._weekly_waist_stat.set_delta(waist_delta)
 
+        # -0.6cm is roughly the old -0.25in threshold, just re-expressed in cm.
         weight_flat = weight_delta is not None and weight_delta.delta is not None and abs(weight_delta.delta) < 0.5
-        waist_down = waist_delta is not None and (waist_delta.delta or 0.0) <= -0.25
+        waist_down = waist_delta is not None and (waist_delta.delta or 0.0) <= -0.6
         if weight_flat and waist_down:
             self._weekly_note.set_label("Waist is down even though weight is flat — still working.")
             self._weekly_note.set_visible(True)
@@ -296,17 +297,17 @@ class BodyMetricsView(ToolbarPage):
             title="Body Fat Estimate",
             description="Navy method, from your latest waist measurement plus neck and height below.",
         )
-        self._neck_row = Adw.EntryRow(title="Neck (in)")
+        self._neck_row = Adw.EntryRow(title="Neck (cm)")
         neck_cm = self._prefs.get_neck_cm()
         if neck_cm is not None:
-            self._neck_row.set_text(f"{units.cm_to_inches(neck_cm):.1f}")
+            self._neck_row.set_text(f"{neck_cm:.1f}")
         self._neck_row.connect("changed", self._on_neck_changed)
         group.add(self._neck_row)
 
-        self._height_row = Adw.EntryRow(title="Height (in)")
+        self._height_row = Adw.EntryRow(title="Height (cm)")
         height_cm = self._prefs.get_height_cm()
         if height_cm is not None:
-            self._height_row.set_text(f"{units.cm_to_inches(height_cm):.1f}")
+            self._height_row.set_text(f"{height_cm:.1f}")
         self._height_row.connect("changed", self._on_height_changed)
         group.add(self._height_row)
 
@@ -324,8 +325,7 @@ class BodyMetricsView(ToolbarPage):
         if digits != text:
             entry.set_text(digits)
             return  # setting text re-triggers "changed"; let the recursive call save it
-        inches = _to_double_or_none(digits)
-        self._prefs.set_neck_cm(units.inches_to_cm(inches) if inches else None)
+        self._prefs.set_neck_cm(_to_double_or_none(digits))
         self._refresh_body_fat_estimate()
 
     def _on_height_changed(self, entry: Adw.EntryRow) -> None:
@@ -334,8 +334,7 @@ class BodyMetricsView(ToolbarPage):
         if digits != text:
             entry.set_text(digits)
             return
-        inches = _to_double_or_none(digits)
-        self._prefs.set_height_cm(units.inches_to_cm(inches) if inches else None)
+        self._prefs.set_height_cm(_to_double_or_none(digits))
         self._refresh_body_fat_estimate()
 
     def _refresh_body_fat_estimate(self) -> None:

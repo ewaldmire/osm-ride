@@ -142,13 +142,13 @@ private fun WeeklyCheckInCard(weightDelta: WeeklyDelta?, waistDelta: WeeklyDelta
             Text("This Week", style = MaterialTheme.typography.titleMedium)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 WeeklyStat(label = "Weight", delta = weightDelta, unit = "lb", modifier = Modifier.weight(1f))
-                WeeklyStat(label = "Waist", delta = waistDelta, unit = "in", modifier = Modifier.weight(1f))
+                WeeklyStat(label = "Waist", delta = waistDelta, unit = "cm", modifier = Modifier.weight(1f))
             }
             // A shrinking waist at a flat weight is still real recomposition progress, not a
             // plateau - worth calling out explicitly since the scale alone would read as nothing
-            // happening.
+            // happening. -0.6cm is roughly the old -0.25in threshold, just re-expressed in cm.
             val weightFlat = weightDelta?.delta?.let { kotlin.math.abs(it) < 0.5 } ?: false
-            val waistDown = (waistDelta?.delta ?: 0.0) <= -0.25
+            val waistDown = (waistDelta?.delta ?: 0.0) <= -0.6
             if (weightFlat && waistDown) {
                 Text(
                     "Waist is down even though weight is flat — still working.",
@@ -244,7 +244,7 @@ private fun WaistTab(
     viewModel: BodyMetricsViewModel,
     entries: List<WaistEntry>,
     points: List<TrendPoint>,
-    onAdd: (waistInches: Double, recordedAtEpochMillis: Long) -> Unit,
+    onAdd: (waistCm: Double, recordedAtEpochMillis: Long) -> Unit,
     onDelete: (id: String) -> Unit,
 ) {
     var input by remember { mutableStateOf("") }
@@ -258,7 +258,7 @@ private fun WaistTab(
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             MeasurementEntryForm(
-                label = "Waist (in)",
+                label = "Waist (cm)",
                 input = input,
                 onInputChange = { input = it },
                 selectedDate = selectedDate,
@@ -287,7 +287,7 @@ private fun WaistTab(
             }
             items(entries, key = { it.id }) { entry ->
                 MeasurementEntryRow(
-                    valueText = Units.formatWaistInches(entry.waistCm),
+                    valueText = Units.formatWaistCm(entry.waistCm),
                     dateText = formatDate(entry.recordedAtEpochMillis),
                     onDelete = { onDelete(entry.id) },
                 )
@@ -298,8 +298,8 @@ private fun WaistTab(
 
 @Composable
 private fun BodyFatEstimateCard(viewModel: BodyMetricsViewModel) {
-    var neckInput by remember { mutableStateOf(viewModel.getNeckInches()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
-    var heightInput by remember { mutableStateOf(viewModel.getHeightInches()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
+    var neckInput by remember { mutableStateOf(viewModel.getNeckCm()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
+    var heightInput by remember { mutableStateOf(viewModel.getHeightCm()?.let { String.format(Locale.US, "%.1f", it) } ?: "") }
     val bodyFatPercent = viewModel.estimateBodyFatPercent()
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -314,9 +314,9 @@ private fun BodyFatEstimateCard(viewModel: BodyMetricsViewModel) {
                     value = neckInput,
                     onValueChange = { text ->
                         neckInput = text.filter { it.isDigit() || it == '.' }
-                        viewModel.setNeckInches(neckInput.toDoubleOrNull())
+                        viewModel.setNeckCm(neckInput.toDoubleOrNull())
                     },
-                    label = { Text("Neck (in)") },
+                    label = { Text("Neck (cm)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),
@@ -325,9 +325,9 @@ private fun BodyFatEstimateCard(viewModel: BodyMetricsViewModel) {
                     value = heightInput,
                     onValueChange = { text ->
                         heightInput = text.filter { it.isDigit() || it == '.' }
-                        viewModel.setHeightInches(heightInput.toDoubleOrNull())
+                        viewModel.setHeightCm(heightInput.toDoubleOrNull())
                     },
-                    label = { Text("Height (in)") },
+                    label = { Text("Height (cm)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f),

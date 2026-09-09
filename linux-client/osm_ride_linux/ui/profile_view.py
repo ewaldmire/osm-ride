@@ -76,7 +76,7 @@ class ProfileView(ToolbarPage):
         if latest_weight is not None:
             parts.append(f"Weight {units.format_weight_lbs(latest_weight.weight_kg)}")
         if latest_waist is not None:
-            parts.append(f"Waist {units.format_waist_inches(latest_waist.waist_cm)}")
+            parts.append(f"Waist {units.format_waist_cm(latest_waist.waist_cm)}")
         return " · ".join(parts)
 
     def _format_date(self, epoch_millis: int) -> str:

@@ -31,8 +31,8 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { weightRepository.deleteEntry(id) }
     }
 
-    fun addWaistEntry(waistInches: Double, recordedAtEpochMillis: Long) {
-        viewModelScope.launch { waistRepository.addEntry(Units.inchesToCm(waistInches), recordedAtEpochMillis) }
+    fun addWaistEntry(waistCm: Double, recordedAtEpochMillis: Long) {
+        viewModelScope.launch { waistRepository.addEntry(waistCm, recordedAtEpochMillis) }
     }
 
     fun deleteWaistEntry(id: String) {
@@ -41,16 +41,16 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
 
     // Neck/height are one-time-ish profile inputs, not tracked trends - plain SharedPreferences
     // reads/writes are enough, same as FTP on Profile.
-    fun getNeckInches(): Double? = SettingsPrefs.getNeckCm(app)?.let { Units.cmToInches(it) }
+    fun getNeckCm(): Double? = SettingsPrefs.getNeckCm(app)
 
-    fun setNeckInches(inches: Double?) {
-        SettingsPrefs.setNeckCm(app, inches?.let { Units.inchesToCm(it) })
+    fun setNeckCm(cm: Double?) {
+        SettingsPrefs.setNeckCm(app, cm)
     }
 
-    fun getHeightInches(): Double? = SettingsPrefs.getHeightCm(app)?.let { Units.cmToInches(it) }
+    fun getHeightCm(): Double? = SettingsPrefs.getHeightCm(app)
 
-    fun setHeightInches(inches: Double?) {
-        SettingsPrefs.setHeightCm(app, inches?.let { Units.inchesToCm(it) })
+    fun setHeightCm(cm: Double?) {
+        SettingsPrefs.setHeightCm(app, cm)
     }
 
     /** Null if there's no waist entry yet, or neck/height haven't been entered. */
@@ -69,9 +69,9 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
 fun weightTrendPoints(entries: List<WeightEntry>): List<TrendPoint> =
     entries.map { TrendPoint(it.recordedAtEpochMillis, Units.kgToLbs(it.weightKg)) }
 
-/** In display units (in) - see [weightTrendPoints]. */
+/** In display units (cm) - see [weightTrendPoints]. */
 fun waistTrendPoints(entries: List<WaistEntry>): List<TrendPoint> =
-    entries.map { TrendPoint(it.recordedAtEpochMillis, Units.cmToInches(it.waistCm)) }
+    entries.map { TrendPoint(it.recordedAtEpochMillis, it.waistCm) }
 
 /** [previousAvg] is null when there's no data from 7-14 days ago yet (e.g. brand new tracking) -
  * callers should show "not enough data yet" rather than a misleading delta in that case. */
