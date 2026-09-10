@@ -22,7 +22,7 @@
         android:pathData="M21,54 a33,33 0 1,0 66,0 a33,33 0 1,0 -66,0" />
     <path
         android:fillColor="#2E7D32"
-        android:pathData="M24.06,54 a29.94,29.94 0 1,0 59.89,0 a29.94,29.94 0 1,0 -59.89,0" />
+        android:pathData="M24.67,54 a29.33,29.33 0 1,0 58.67,0 a29.33,29.33 0 1,0 -58.67,0" />
     <path
         android:strokeColor="#B8BCC2"
         android:strokeWidth="4.58"

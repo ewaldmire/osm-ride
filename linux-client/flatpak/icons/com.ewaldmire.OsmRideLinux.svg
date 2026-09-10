@@ -10,7 +10,7 @@
        loop on the left while its own belly curve stays under it, matching a
        real square knot's alternating over/under). -->
   <circle cx="54" cy="54" r="54" fill="#B8BCC2"/>
-  <circle cx="54" cy="54" r="49" fill="#2E7D32"/>
+  <circle cx="54" cy="54" r="48" fill="#2E7D32"/>
   <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7.5">
     <path stroke="#B8BCC2" d="M 63.34,37.68 C 52.67,37.68 50.00,47.28 42.00,47.28" />
     <path stroke="#B8BCC2" d="M 42.00,60.72 C 50.00,60.72 52.67,70.32 63.34,70.32" />
