@@ -7,9 +7,11 @@ import com.ewaldmire.osmride.OsmRideApp
 import com.ewaldmire.osmride.route.BRouterClient
 import com.ewaldmire.osmride.route.GpxParser
 import com.ewaldmire.osmride.route.ParsedGpx
+import com.ewaldmire.osmride.route.RoutePoint
 import com.ewaldmire.osmride.route.RouteSummary
 import com.ewaldmire.osmride.route.RouteThumbnailGenerator
 import com.ewaldmire.osmride.route.RouteWaypoint
+import com.ewaldmire.osmride.util.Haversine
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,6 +55,19 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
     private val _hint = MutableStateFlow<String?>(null)
     val hint: StateFlow<String?> = _hint.asStateFlow()
 
+    private val _selectedWaypointIndex = MutableStateFlow<Int?>(null)
+    val selectedWaypointIndex: StateFlow<Int?> = _selectedWaypointIndex.asStateFlow()
+
+    // Segment i = the stretch of route between waypoints[i] and waypoints[i + 1].
+    private val _selectedSegmentIndex = MutableStateFlow<Int?>(null)
+    val selectedSegmentIndex: StateFlow<Int?> = _selectedSegmentIndex.asStateFlow()
+
+    // waypointAnchorIndices[i] = the index into previewGpx.points closest to waypoints[i].
+    // Recomputed once per successful reroute; shared by selectNearestSegment's hit-testing and
+    // by the map's segment-highlight rendering so the nearest-point search isn't done twice.
+    private val _waypointAnchorIndices = MutableStateFlow<List<Int>>(emptyList())
+    val waypointAnchorIndices: StateFlow<List<Int>> = _waypointAnchorIndices.asStateFlow()
+
     fun loadForEdit(routeId: String, showDerivedHint: Boolean = false) {
         if (existingId == routeId) return
         existingId = routeId
@@ -75,20 +90,89 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun addWaypoint(lat: Double, lon: Double) {
+        clearSelections()
         _waypoints.value = _waypoints.value + RouteWaypoint(lat, lon)
         routeCurrentWaypoints()
     }
 
     fun undoLastWaypoint() {
         if (_waypoints.value.isEmpty()) return
+        clearSelections()
         _waypoints.value = _waypoints.value.dropLast(1)
         routeCurrentWaypoints()
     }
 
     fun clearWaypoints() {
+        clearSelections()
         _waypoints.value = emptyList()
         _previewGpx.value = null
         rawGpxText = null
+        _waypointAnchorIndices.value = emptyList()
+    }
+
+    /** Selects an existing waypoint (e.g. tapped on the map) so it can be deleted. */
+    fun selectWaypoint(index: Int) {
+        _selectedSegmentIndex.value = null
+        _selectedWaypointIndex.value = index
+    }
+
+    /** Called when a pending delete is dismissed without confirming. */
+    fun deselectWaypoint() {
+        _selectedWaypointIndex.value = null
+    }
+
+    fun removeSelectedWaypoint() {
+        val index = _selectedWaypointIndex.value ?: return
+        clearSelections()
+        _waypoints.value = _waypoints.value.filterIndexed { i, _ -> i != index }
+        routeCurrentWaypoints()
+    }
+
+    /**
+     * Long-press handler: highlights the existing route segment nearest [lat]/[lon] so a
+     * following tap (anywhere - it usually needs to land *off* the current line to actually
+     * divert the route) can insert a new waypoint into that segment.
+     */
+    fun selectNearestSegment(lat: Double, lon: Double) {
+        val points = _previewGpx.value?.points ?: return
+        val anchors = _waypointAnchorIndices.value
+        if (anchors.size < 2 || points.isEmpty()) return
+        _selectedWaypointIndex.value = null
+        val nearestPoint = nearestPointIndex(points, lat, lon)
+        var segment = anchors.size - 2
+        for (i in 0 until anchors.size - 1) {
+            if (nearestPoint <= anchors[i + 1]) {
+                segment = i
+                break
+            }
+        }
+        _selectedSegmentIndex.value = segment
+        _hint.value = "Tap to add a point here"
+    }
+
+    fun insertWaypointAtSelectedSegment(lat: Double, lon: Double) {
+        val index = _selectedSegmentIndex.value ?: return
+        clearSelections()
+        _waypoints.value = _waypoints.value.toMutableList().apply { add(index + 1, RouteWaypoint(lat, lon)) }
+        routeCurrentWaypoints()
+    }
+
+    private fun clearSelections() {
+        _selectedWaypointIndex.value = null
+        _selectedSegmentIndex.value = null
+    }
+
+    private fun nearestPointIndex(points: List<RoutePoint>, lat: Double, lon: Double, fromIndex: Int = 0): Int {
+        var bestIndex = fromIndex
+        var bestDistance = Double.MAX_VALUE
+        for (index in fromIndex until points.size) {
+            val distance = Haversine.distanceMeters(lat, lon, points[index].lat, points[index].lon)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                bestIndex = index
+            }
+        }
+        return bestIndex
     }
 
     private fun routeCurrentWaypoints() {
@@ -96,6 +180,7 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
         if (current.size < 2) {
             _previewGpx.value = null
             rawGpxText = null
+            _waypointAnchorIndices.value = emptyList()
             return
         }
         viewModelScope.launch {
@@ -104,13 +189,26 @@ class RouteCreatorViewModel(application: Application) : AndroidViewModel(applica
             BRouterClient.route(current)
                 .onSuccess { gpxText ->
                     rawGpxText = gpxText
-                    _previewGpx.value = withContext(Dispatchers.Default) {
+                    val parsed = withContext(Dispatchers.Default) {
                         gpxText.byteInputStream().use { GpxParser.parse(it) }
+                    }
+                    _previewGpx.value = parsed
+                    // Searched sequentially (each waypoint's search starts where the previous
+                    // one's ended) rather than independently over the whole polyline, so the
+                    // anchors come out non-decreasing even if the route loops back near an
+                    // earlier waypoint - selectNearestSegment's binary-ish scan below assumes
+                    // that ordering.
+                    var searchFrom = 0
+                    _waypointAnchorIndices.value = current.map { waypoint ->
+                        val anchor = nearestPointIndex(parsed.points, waypoint.lat, waypoint.lon, searchFrom)
+                        searchFrom = anchor
+                        anchor
                     }
                 }
                 .onFailure {
                     rawGpxText = null
                     _previewGpx.value = null
+                    _waypointAnchorIndices.value = emptyList()
                     _error.value = "Couldn't route those waypoints: ${it.message}"
                 }
             _isRouting.value = false

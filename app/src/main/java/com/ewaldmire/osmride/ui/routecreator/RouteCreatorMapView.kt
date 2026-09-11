@@ -25,20 +25,33 @@ import org.maplibre.geojson.Point
 
 private const val WAYPOINTS_SOURCE_ID = "creator-waypoints-source"
 private const val WAYPOINTS_LAYER_ID = "creator-waypoints-layer"
+private const val SELECTED_SOURCE_ID = "creator-selected-source"
+private const val SELECTED_LAYER_ID = "creator-selected-layer"
 private const val PREVIEW_SOURCE_ID = "creator-preview-source"
 private const val PREVIEW_LAYER_ID = "creator-preview-layer"
+private const val SEGMENT_HIGHLIGHT_SOURCE_ID = "creator-segment-highlight-source"
+private const val SEGMENT_HIGHLIGHT_LAYER_ID = "creator-segment-highlight-layer"
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 
 /**
- * Map for building/editing a route: tapping places a waypoint (handled by the caller via
- * [onMapTapped]), placed waypoints render as dots, and [previewPoints] - the BRouter-routed line
- * through them, once fetched - renders as a polyline.
+ * Map for building/editing a route. Three gestures, dispatched by the caller:
+ * - Tap empty map / [onMapTapped]: append a waypoint (or, if the caller has a segment selected
+ *   from a prior long-press, insert one into that segment instead - this view doesn't know which).
+ * - Tap an existing waypoint / [onWaypointTapped]: hit-tested here via [MapLibreMap]'s own
+ *   `queryRenderedFeatures` against the rendered waypoint dots, so precision is screen-space (it
+ *   naturally tightens as the user zooms in) rather than a fixed ground-distance radius.
+ * - Long-press anywhere / [onSegmentLongPressed]: the press doesn't need to land on anything in
+ *   particular - the caller resolves it to the nearest existing route segment.
  */
 @Composable
 fun RouteCreatorMapView(
     waypoints: List<RouteWaypoint>,
     previewPoints: List<RouteWaypoint>?,
+    highlightedSegmentPoints: List<RouteWaypoint>?,
+    selectedWaypointIndex: Int?,
     onMapTapped: (lat: Double, lon: Double) -> Unit,
+    onWaypointTapped: (index: Int) -> Unit,
+    onSegmentLongPressed: (lat: Double, lon: Double) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -63,7 +76,20 @@ fun RouteCreatorMapView(
         mapView.getMapAsync { map ->
             map.uiSettings.isCompassEnabled = false
             map.addOnMapClickListener { latLng ->
-                onMapTapped(latLng.latitude, latLng.longitude)
+                val screenPoint = map.projection.toScreenLocation(latLng)
+                val tappedIndex = map.queryRenderedFeatures(screenPoint, WAYPOINTS_LAYER_ID)
+                    .firstOrNull()
+                    ?.getNumberProperty("index")
+                    ?.toInt()
+                if (tappedIndex != null) {
+                    onWaypointTapped(tappedIndex)
+                } else {
+                    onMapTapped(latLng.latitude, latLng.longitude)
+                }
+                true
+            }
+            map.addOnMapLongClickListener { latLng ->
+                onSegmentLongPressed(latLng.latitude, latLng.longitude)
                 true
             }
             map.setStyle(Style.Builder().fromJson(OsmRasterStyle.JSON)) { style ->
@@ -72,6 +98,22 @@ fun RouteCreatorMapView(
                     LineLayer(PREVIEW_LAYER_ID, PREVIEW_SOURCE_ID).withProperties(
                         PropertyFactory.lineColor("#EF6C00"),
                         PropertyFactory.lineWidth(5f),
+                    ),
+                )
+                style.addSource(GeoJsonSource(SEGMENT_HIGHLIGHT_SOURCE_ID))
+                style.addLayer(
+                    LineLayer(SEGMENT_HIGHLIGHT_LAYER_ID, SEGMENT_HIGHLIGHT_SOURCE_ID).withProperties(
+                        PropertyFactory.lineColor("#FFC107"),
+                        PropertyFactory.lineWidth(8f),
+                    ),
+                )
+                // Painted before the normal waypoint dots so it reads as a highlight halo behind
+                // the selected one, rather than covering it.
+                style.addSource(GeoJsonSource(SELECTED_SOURCE_ID))
+                style.addLayer(
+                    CircleLayer(SELECTED_LAYER_ID, SELECTED_SOURCE_ID).withProperties(
+                        PropertyFactory.circleRadius(13f),
+                        PropertyFactory.circleColor("#FFC107"),
                     ),
                 )
                 style.addSource(GeoJsonSource(WAYPOINTS_SOURCE_ID))
@@ -88,11 +130,12 @@ fun RouteCreatorMapView(
         onDispose { }
     }
 
-    DisposableEffect(waypoints) {
+    DisposableEffect(waypoints, selectedWaypointIndex) {
         mapView.getMapAsync { map ->
             val style = map.style ?: return@getMapAsync
-            val source = style.getSourceAs<GeoJsonSource>(WAYPOINTS_SOURCE_ID) ?: return@getMapAsync
-            source.setGeoJson(waypointsGeoJson(waypoints))
+            style.getSourceAs<GeoJsonSource>(WAYPOINTS_SOURCE_ID)?.setGeoJson(waypointsGeoJson(waypoints))
+            style.getSourceAs<GeoJsonSource>(SELECTED_SOURCE_ID)
+                ?.setGeoJson(selectedWaypointGeoJson(waypoints, selectedWaypointIndex))
 
             if (!hasCenteredOnce.value && waypoints.isNotEmpty()) {
                 hasCenteredOnce.value = true
@@ -123,13 +166,34 @@ fun RouteCreatorMapView(
         onDispose { }
     }
 
+    DisposableEffect(highlightedSegmentPoints) {
+        mapView.getMapAsync { map ->
+            val style = map.style ?: return@getMapAsync
+            val source = style.getSourceAs<GeoJsonSource>(SEGMENT_HIGHLIGHT_SOURCE_ID) ?: return@getMapAsync
+            if (highlightedSegmentPoints != null && highlightedSegmentPoints.size >= 2) {
+                val line = LineString.fromLngLats(
+                    highlightedSegmentPoints.map { Point.fromLngLat(it.lon, it.lat) },
+                )
+                source.setGeoJson(Feature.fromGeometry(line))
+            } else {
+                source.setGeoJson(EMPTY_FEATURE_COLLECTION)
+            }
+        }
+        onDispose { }
+    }
+
     AndroidView(factory = { mapView }, modifier = modifier.fillMaxSize())
 }
 
 private fun waypointsGeoJson(waypoints: List<RouteWaypoint>): String {
     if (waypoints.isEmpty()) return EMPTY_FEATURE_COLLECTION
-    val features = waypoints.joinToString(",") {
-        """{"type":"Feature","geometry":{"type":"Point","coordinates":[${it.lon},${it.lat}]},"properties":{}}"""
-    }
+    val features = waypoints.mapIndexed { index, waypoint ->
+        """{"type":"Feature","geometry":{"type":"Point","coordinates":[${waypoint.lon},${waypoint.lat}]},"properties":{"index":$index}}"""
+    }.joinToString(",")
     return """{"type":"FeatureCollection","features":[$features]}"""
+}
+
+private fun selectedWaypointGeoJson(waypoints: List<RouteWaypoint>, selectedIndex: Int?): String {
+    val waypoint = selectedIndex?.let { waypoints.getOrNull(it) } ?: return EMPTY_FEATURE_COLLECTION
+    return """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[${waypoint.lon},${waypoint.lat}]},"properties":{}}]}"""
 }
