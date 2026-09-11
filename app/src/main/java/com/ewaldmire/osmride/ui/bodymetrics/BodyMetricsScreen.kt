@@ -132,7 +132,7 @@ fun BodyMetricsScreen(
             stickyHeader {
                 TabRow(selectedTabIndex = selectedTab) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Weight") })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Waist") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Measurements") })
                 }
             }
             if (selectedTab == 0) {
