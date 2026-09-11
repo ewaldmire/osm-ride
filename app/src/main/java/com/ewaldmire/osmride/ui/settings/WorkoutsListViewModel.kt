@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class WorkoutsListViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = (application as OsmRideApp).workoutRepository
+    private val app = application as OsmRideApp
+    private val repository = app.workoutRepository
 
     val workouts: StateFlow<List<Workout>> = repository.workouts
 
@@ -21,7 +22,7 @@ class WorkoutsListViewModel(application: Application) : AndroidViewModel(applica
 
     fun importWorkout(uri: Uri, displayName: String?) {
         viewModelScope.launch {
-            val ftpWatts = SettingsPrefs.getFtpWatts(getApplication())
+            val ftpWatts = app.ftpRepository.entries.value.firstOrNull()?.ftpWatts
             repository.importWorkout(uri, displayName, ftpWatts)
                 .onFailure { _importError.value = it.message ?: "Could not import that workout file" }
         }

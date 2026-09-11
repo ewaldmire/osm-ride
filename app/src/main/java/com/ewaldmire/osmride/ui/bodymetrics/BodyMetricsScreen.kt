@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.util.Units
+import com.ewaldmire.osmride.weight.FtpEntry
 import com.ewaldmire.osmride.weight.WaistEntry
 import com.ewaldmire.osmride.weight.WeightEntry
 import java.time.Instant
@@ -85,10 +86,12 @@ fun BodyMetricsScreen(
 ) {
     val weightEntries by viewModel.weightEntries.collectAsState()
     val waistEntries by viewModel.waistEntries.collectAsState()
+    val ftpEntries by viewModel.ftpEntries.collectAsState()
     var selectedTab by rememberSaveable { mutableStateOf(0) }
 
     val weightPoints = remember(weightEntries) { weightTrendPoints(weightEntries) }
     val waistPoints = remember(waistEntries) { waistTrendPoints(waistEntries) }
+    val ftpPoints = remember(ftpEntries) { ftpTrendPoints(ftpEntries) }
 
     val listState = rememberLazyListState()
 
@@ -99,7 +102,7 @@ fun BodyMetricsScreen(
                     Column {
                         Text("Body Metrics")
                         Text(
-                            "Track your weight and waist over time",
+                            "Track your weight, measurements, and FTP over time",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -133,22 +136,28 @@ fun BodyMetricsScreen(
                 TabRow(selectedTabIndex = selectedTab) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Weight") })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Measurements") })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("FTP") })
                 }
             }
-            if (selectedTab == 0) {
-                weightTabItems(
+            when (selectedTab) {
+                0 -> weightTabItems(
                     entries = weightEntries,
                     points = weightPoints,
                     onAdd = viewModel::addWeightEntry,
                     onDelete = viewModel::deleteWeightEntry,
                 )
-            } else {
-                waistTabItems(
+                1 -> waistTabItems(
                     viewModel = viewModel,
                     entries = waistEntries,
                     points = waistPoints,
                     onAdd = viewModel::addWaistEntry,
                     onDelete = viewModel::deleteWaistEntry,
+                )
+                else -> ftpTabItems(
+                    entries = ftpEntries,
+                    points = ftpPoints,
+                    onAdd = viewModel::addFtpEntry,
+                    onDelete = viewModel::deleteFtpEntry,
                 )
             }
         }
@@ -158,16 +167,25 @@ fun BodyMetricsScreen(
     // actually did anything unless the user happens to already be scrolled to it. Entries are
     // newest-first, so the new one is always entries.first(); its index in the combined list is
     // just how many item{} blocks precede items(entries) for the active tab, which mirrors the
-    // exact conditions used above/in weightTabItems/waistTabItems to decide what gets emitted.
-    val currentEntries = if (selectedTab == 0) weightEntries else waistEntries
-    val currentPoints = if (selectedTab == 0) weightPoints else waistPoints
+    // exact conditions used above/in weightTabItems/waistTabItems/ftpTabItems to decide what gets
+    // emitted.
+    val currentEntries = when (selectedTab) {
+        0 -> weightEntries
+        1 -> waistEntries
+        else -> ftpEntries
+    }
+    val currentPoints = when (selectedTab) {
+        0 -> weightPoints
+        1 -> waistPoints
+        else -> ftpPoints
+    }
     var previousEntryCount by remember(selectedTab) { mutableStateOf(currentEntries.size) }
     LaunchedEffect(selectedTab, currentEntries.size) {
         if (currentEntries.size > previousEntryCount) {
             val showsChart = currentEntries.isNotEmpty() && currentPoints.size >= 2
             val headerItemCount = 2 + // "This Week" card + sticky tab row
                 1 + // entry form
-                (if (selectedTab == 1) 1 else 0) + // body-fat estimate card, waist tab only
+                (if (selectedTab == 1) 1 else 0) + // body-fat estimate card, Measurements tab only
                 (if (showsChart) 1 else 0)
             listState.animateScrollToItem(headerItemCount)
         }
@@ -269,6 +287,62 @@ private fun LazyListScope.weightTabItems(
         items(entries, key = { it.id }) { entry ->
             MeasurementEntryRow(
                 valueText = Units.formatWeightLbs(entry.weightKg),
+                dateText = formatDate(entry.recordedAtEpochMillis),
+                onDelete = { onDelete(entry.id) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+    }
+}
+
+private fun LazyListScope.ftpTabItems(
+    entries: List<FtpEntry>,
+    points: List<TrendPoint>,
+    onAdd: (ftpWatts: Int, recordedAtEpochMillis: Long) -> Unit,
+    onDelete: (id: String) -> Unit,
+) {
+    item {
+        var input by remember { mutableStateOf("") }
+        var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+        var showDatePicker by remember { mutableStateOf(false) }
+
+        if (showDatePicker) {
+            MeasurementDatePickerDialog(selectedDate, onSelect = { selectedDate = it }, onDismiss = { showDatePicker = false })
+        }
+
+        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            MeasurementEntryForm(
+                label = "FTP (watts)",
+                input = input,
+                onInputChange = { input = it },
+                selectedDate = selectedDate,
+                onDatePickerRequested = { showDatePicker = true },
+                onLog = {
+                    val value = input.toIntOrNull()
+                    if (value != null && value > 0) {
+                        onAdd(value, selectedDate.toLocalNoonEpochMillis())
+                        input = ""
+                        selectedDate = LocalDate.now()
+                    }
+                },
+            )
+        }
+    }
+
+    if (entries.isEmpty()) {
+        item { EmptyMeasurementState("No FTP tests logged yet.") }
+    } else {
+        if (points.size >= 2) {
+            item {
+                TrendChart(
+                    points = points,
+                    modifier = Modifier.fillMaxWidth().height(90.dp).padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+        }
+        items(entries, key = { it.id }) { entry ->
+            MeasurementEntryRow(
+                valueText = "${entry.ftpWatts} W",
                 dateText = formatDate(entry.recordedAtEpochMillis),
                 onDelete = { onDelete(entry.id) },
                 modifier = Modifier.padding(horizontal = 16.dp),

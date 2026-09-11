@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ewaldmire.osmride.OsmRideApp
 import com.ewaldmire.osmride.ui.settings.SettingsPrefs
 import com.ewaldmire.osmride.util.Units
+import com.ewaldmire.osmride.weight.FtpEntry
 import com.ewaldmire.osmride.weight.NavyBodyFat
 import com.ewaldmire.osmride.weight.WaistEntry
 import com.ewaldmire.osmride.weight.WeightEntry
@@ -16,12 +17,16 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
     private val app = application as OsmRideApp
     private val weightRepository = app.weightRepository
     private val waistRepository = app.waistRepository
+    private val ftpRepository = app.ftpRepository
 
     /** Newest first. */
     val weightEntries: StateFlow<List<WeightEntry>> = weightRepository.entries
 
     /** Newest first. */
     val waistEntries: StateFlow<List<WaistEntry>> = waistRepository.entries
+
+    /** Newest first. */
+    val ftpEntries: StateFlow<List<FtpEntry>> = ftpRepository.entries
 
     fun addWeightEntry(weightLbs: Double, recordedAtEpochMillis: Long) {
         viewModelScope.launch { weightRepository.addEntry(Units.lbsToKg(weightLbs), recordedAtEpochMillis) }
@@ -39,8 +44,17 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { waistRepository.deleteEntry(id) }
     }
 
+    fun addFtpEntry(ftpWatts: Int, recordedAtEpochMillis: Long) {
+        viewModelScope.launch { ftpRepository.addEntry(ftpWatts, recordedAtEpochMillis) }
+    }
+
+    fun deleteFtpEntry(id: String) {
+        viewModelScope.launch { ftpRepository.deleteEntry(id) }
+    }
+
     // Neck/height are one-time-ish profile inputs, not tracked trends - plain SharedPreferences
-    // reads/writes are enough, same as FTP on Profile.
+    // reads/writes are enough. FTP used to be handled the same way but now has real history, see
+    // FtpRepository.
     fun getNeckCm(): Double? = SettingsPrefs.getNeckCm(app)
 
     fun setNeckCm(cm: Double?) {
@@ -72,6 +86,10 @@ fun weightTrendPoints(entries: List<WeightEntry>): List<TrendPoint> =
 /** In display units (cm) - see [weightTrendPoints]. */
 fun waistTrendPoints(entries: List<WaistEntry>): List<TrendPoint> =
     entries.map { TrendPoint(it.recordedAtEpochMillis, it.waistCm) }
+
+/** Watts need no unit conversion - see [weightTrendPoints]. */
+fun ftpTrendPoints(entries: List<FtpEntry>): List<TrendPoint> =
+    entries.map { TrendPoint(it.recordedAtEpochMillis, it.ftpWatts.toDouble()) }
 
 /** [previousAvg] is null when there's no data from 7-14 days ago yet (e.g. brand new tracking) -
  * callers should show "not enough data yet" rather than a misleading delta in that case. */

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MonitorWeight
@@ -18,7 +17,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -39,13 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ewaldmire.osmride.ui.activities.ActivitiesContent
 import com.ewaldmire.osmride.ui.activities.ActivitiesViewModel
-import com.ewaldmire.osmride.ui.settings.SettingsPrefs
 import com.ewaldmire.osmride.util.Units
+import com.ewaldmire.osmride.weight.FtpEntry
 import com.ewaldmire.osmride.weight.WaistEntry
 import com.ewaldmire.osmride.weight.WeightEntry
 
@@ -54,7 +51,7 @@ enum class ProfileTab { Activities, Metrics }
 /**
  * Personal "about you" data: completed activities (any .fit-imported outdoor activity, plus
  * strength workouts shared in from fosslift - see ActivitiesScreen.kt) and body
- * measurements/training info (weight/waist/body-fat via Body Metrics, FTP) - as opposed to
+ * measurements/training info (weight/measurements/body-fat/FTP, all via Body Metrics) - as opposed to
  * Settings, which is just app configuration (Bluetooth pairing). Tabbed the same way as the Ride
  * hub/Workouts screen used to be, since Activities used to live under Ride hub before .fit
  * imports could be non-cycling activities.
@@ -148,12 +145,12 @@ private fun MetricsTab(
     viewModel: ProfileViewModel,
     onOpenBodyMetrics: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var ftpText by remember { mutableStateOf(SettingsPrefs.getFtpWatts(context)?.toString() ?: "") }
     val weightEntries by viewModel.weightEntries.collectAsState()
     val waistEntries by viewModel.waistEntries.collectAsState()
+    val ftpEntries by viewModel.ftpEntries.collectAsState()
     val latestWeight = weightEntries.firstOrNull()
     val latestWaist = waistEntries.firstOrNull()
+    val latestFtp = ftpEntries.firstOrNull()
 
     Column(
         modifier = Modifier.padding(padding).padding(16.dp),
@@ -170,7 +167,7 @@ private fun MetricsTab(
                     Column {
                         Text("Body Metrics", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            bodyMetricsSummary(latestWeight, latestWaist),
+                            bodyMetricsSummary(latestWeight, latestWaist, latestFtp),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -178,28 +175,15 @@ private fun MetricsTab(
                 Icon(Icons.Filled.ChevronRight, contentDescription = null)
             }
         }
-
-        Text("Training", style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(
-            value = ftpText,
-            onValueChange = { text ->
-                ftpText = text.filter { it.isDigit() }
-                SettingsPrefs.setFtpWatts(context, ftpText.toIntOrNull())
-            },
-            label = { Text("FTP (watts)") },
-            supportingText = { Text("Needed to convert %FTP-based .mrc/.zwo workouts to watts") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
-private fun bodyMetricsSummary(latestWeight: WeightEntry?, latestWaist: WaistEntry?): String {
-    if (latestWeight == null && latestWaist == null) return "No measurements logged yet"
+private fun bodyMetricsSummary(latestWeight: WeightEntry?, latestWaist: WaistEntry?, latestFtp: FtpEntry?): String {
+    if (latestWeight == null && latestWaist == null && latestFtp == null) return "No measurements logged yet"
     val parts = mutableListOf<String>()
     latestWeight?.let { parts.add("Weight ${Units.formatWeightLbs(it.weightKg)}") }
     latestWaist?.let { parts.add("Waist ${Units.formatWaistCm(it.waistCm)}") }
+    latestFtp?.let { parts.add("FTP ${it.ftpWatts} W") }
     return parts.joinToString(" · ")
 }
 
